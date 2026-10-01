@@ -1,0 +1,119 @@
+/* Control bar buttons appear only when the video has a bar configuration. */
+.be-video-control-bar-extend-item[data-name='barLineMetronome'],
+.be-video-control-bar-extend-item[data-name='barLineFirst'],
+.be-video-control-bar-extend-item[data-name='barLinePrev'],
+.be-video-control-bar-extend-item[data-name='barLineNext'],
+.be-video-control-bar-extend-item[data-name='barLineLoop'] {
+  display: none;
+}
+body.barline-active.barline-configured .be-video-control-bar-extend-item[data-name='barLineMetronome'],
+body.barline-active.barline-configured .be-video-control-bar-extend-item[data-name='barLineFirst'],
+body.barline-active.barline-configured .be-video-control-bar-extend-item[data-name='barLinePrev'],
+body.barline-active.barline-configured .be-video-control-bar-extend-item[data-name='barLineNext'],
+body.barline-active.barline-configured .be-video-control-bar-extend-item[data-name='barLineLoop'] {
+  display: flex;
+}
+body.barline-active.barline-configured.barline-metronome-on .be-video-control-bar-extend-item[data-name='barLineMetronome'] .be-icon {
+  color: #ff8a3d;
+}
+/* 「隐藏上下小节按钮」 */
+body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLinePrev'],
+body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineNext'] {
+  display: none !important;
+}
+
+/* ---------- Progress bar overlay ---------- */
+.barline-overlay { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 5; }
+.barline-marker-label { position: absolute; top: -17px; transform: translateX(-50%); padding: 2px 5px; border-radius: 4px; font: 600 10px/1 system-ui, sans-serif; white-space: nowrap; background: rgba(0, 0, 0, .72); pointer-events: none; }
+.barline-loop-band { position: absolute; top: 0; bottom: 0; background: rgba(255, 138, 61, .32); border-radius: 2px; }
+
+/* ---------- Metronome volume slider ---------- */
+.barline-volume-vertical { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 22px; }
+.barline-volume-number { color: #fff; font: 600 12px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; }
+.barline-volume-track { position: relative; width: 4px; height: 72px; margin: 4px; background: rgba(255, 255, 255, .28); border-radius: 2px; cursor: pointer; }
+.barline-volume-track::before { content: ''; position: absolute; left: 50%; top: -10px; bottom: -10px; width: 20px; transform: translateX(-50%); }
+.barline-volume-fill { position: absolute; left: 0; right: 0; bottom: 0; background: #00aeec; border-radius: 2px; }
+.barline-volume-thumb { position: absolute; left: 50%; width: 12px; height: 12px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #00aeec; transform: translate(-50%, 50%); pointer-events: none; }
+
+/* ---------- Dialog content (editor + manager) ---------- */
+.barline-editor { padding: 16px 22px 18px; }
+
+.ble-card { margin: 0 0 14px; padding: 14px 16px; border: 1px solid var(--bl-border); border-radius: var(--bl-radius); background: var(--bl-bg); }
+.ble-card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 4px; }
+.ble-card-head h3 { margin: 0; font-size: 15px; font-weight: 600; color: var(--bl-text); }
+.ble-card-head .bl-muted { display: inline-flex; align-items: center; gap: 4px; }
+
+.ble-marker-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 6px; padding: 8px; border-radius: var(--bl-radius-sm); background: var(--bl-surface); }
+.barline-ui .ble-play { width: 34px; padding: 0; border-radius: 50%; font-size: 12px; }
+.ble-clock { min-width: 86px; font: 600 15px ui-monospace, 'Cascadia Mono', Consolas, monospace; color: var(--bl-text); font-variant-numeric: tabular-nums; }
+.ble-marks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.ble-mark { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 2px 0 8px; border-radius: 999px; font-size: 11px; color: var(--bl-text-2); background: var(--bl-surface-2); }
+.ble-mark b { font: 500 11px ui-monospace, Consolas, monospace; color: var(--bl-text); }
+
+.ble-table { margin-top: 8px; border: 1px solid var(--bl-border); border-radius: var(--bl-radius-sm); overflow: hidden; }
+.ble-tr { display: grid; grid-template-columns: 30px 84px 150px 1fr 28px; align-items: center; gap: 8px; padding: 6px 10px; }
+.ble-th { padding-top: 4px; padding-bottom: 4px; font-size: 12px; color: var(--bl-text-2); background: var(--bl-surface); border-bottom: 1px solid var(--bl-border); }
+.barline-ui .ble-th button.ghost { justify-content: flex-start; padding: 0 4px; color: var(--bl-text-2); font-weight: 600; }
+.ble-tbody { max-height: 228px; overflow-y: auto; }
+.ble-tbody .ble-tr + .ble-tr { border-top: 1px solid var(--bl-border); }
+.ble-index { color: var(--bl-text-3); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+.barline-ui .ble-tr > input[type=number] { width: 100%; }
+.barline-ui .ble-tr .bl-input-group input[type=number] { width: 52px; }
+.barline-ui .ble-tr .bl-input-group select { width: 56px; padding: 0 4px; }
+.barline-ui .ble-tr .bl-input-group .ble-time { width: 96px; }
+.barline-ui .ble-tr .bl-input-group button { width: 28px; padding: 0; }
+.barline-ui .ble-tr .bl-input-group > b { font-size: 12px; white-space: nowrap; }
+.barline-ui .ble-add { width: 100%; height: 34px; margin-top: 10px; color: var(--bl-text-2); background: transparent; border: 1px dashed var(--bl-border-strong); }
+
+.ble-tap { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 18px; }
+.barline-ui .ble-tap-btn { flex-direction: column; gap: 3px; width: 128px; height: 76px; border: 2px solid var(--bl-accent); border-radius: 14px; color: var(--bl-accent); background: var(--bl-accent-soft); font-size: 16px; font-weight: 600; user-select: none; }
+.barline-ui .ble-tap-btn small { font-size: 11px; font-weight: 400; color: var(--bl-text-2); }
+.barline-ui .ble-tap-btn:active:not(:disabled) { transform: scale(.97); }
+.ble-tap-value { display: flex; flex-direction: column; align-items: center; min-width: 72px; }
+.ble-tap-value b { font-size: 30px; line-height: 1.1; color: var(--bl-text-3); font-variant-numeric: tabular-nums; }
+.ble-tap-value b.active { color: var(--bl-text); }
+.ble-tap-value span { font-size: 11px; color: var(--bl-text-3); }
+.ble-tap-side .bl-row { margin-top: 0; }
+.ble-tap-side .bl-check { margin: 4px 0; font-size: 12px; }
+
+.ble-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.barline-ui .ble-actions button.primary { min-width: 84px; }
+
+@container (max-width: 540px) {
+  .ble-tr { grid-template-columns: 24px 70px 1fr 24px; }
+  .ble-tr > :nth-child(4) { grid-column: 2 / 4; }
+  .ble-th > :nth-child(4) { display: none; }
+  .ble-tap { grid-template-columns: auto 1fr; }
+  .ble-tap-side { grid-column: 1 / -1; }
+}
+
+/* ---------- Manager ---------- */
+.barline-manage-dialog { width: min(820px, 94vw); }
+.blm-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.barline-ui .blm-search { flex: 1; min-width: 180px; height: 34px; padding: 0 12px; color: var(--bl-text); background: var(--bl-surface); border: 1px solid transparent; border-radius: 999px; font: 13px system-ui, 'PingFang SC', sans-serif; outline: none; }
+.barline-ui .blm-search:focus { background: var(--bl-bg); border-color: var(--bl-accent); box-shadow: 0 0 0 3px var(--bl-accent-soft); }
+.blm-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 10px; }
+.blm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); grid-auto-rows: 160px; gap: 12px; min-height: 40vh; max-height: 60vh; align-content: start; overflow: auto; padding: 2px 2px 8px; }
+.blm-grid-empty { grid-column: 1 / -1; padding: 40px 0; color: var(--bl-text-3); font-size: 13px; text-align: center; }
+.blm-card { overflow: hidden; border: 1px solid var(--bl-border); border-radius: var(--bl-radius); background: var(--bl-bg); transition: border-color .15s, box-shadow .15s, transform .15s; }
+.blm-card:hover { border-color: var(--bl-border-strong); box-shadow: 0 6px 18px rgba(0, 0, 0, .08); transform: translateY(-1px); }
+.blm-card.selected { border-color: var(--bl-accent); box-shadow: 0 0 0 2px var(--bl-accent-soft); }
+.blm-card-inner { display: flex; flex-direction: column; height: 100%; color: var(--bl-text); text-decoration: none; }
+.blm-cover-wrap { position: relative; display: block; flex: 0 0 104px; height: 104px; overflow: hidden; background: var(--bl-surface-2); }
+.blm-cover { display: block; width: 100%; height: 100%; object-fit: cover; }
+.blm-cover-empty { display: flex; align-items: center; justify-content: center; color: var(--bl-text-3); font-size: 28px; }
+.blm-check { position: absolute; top: 8px; left: 8px; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; border: 2px solid rgba(255, 255, 255, .95); background: rgba(0, 0, 0, .35); color: #fff; font-size: 13px; cursor: pointer; user-select: none; opacity: 0; transition: opacity .12s; }
+.blm-card:hover .blm-check, .blm-check.checked { opacity: 1; }
+.blm-check.checked { background: var(--bl-accent); border-color: var(--bl-accent); }
+.blm-title { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 8px 10px; font-size: 12px; line-height: 1.45; }
+.barline-ui .ble-card .bl-input-group input[aria-label='手动添加小节起点'] { width: 140px; }
+
+/* ---------- Embedded in the panel ---------- */
+.barline-editor.embedded { padding: 0; }
+.barline-editor.embedded .ble-card { padding: 12px 14px; }
+.barline-editor.embedded .ble-actions { margin: 0 0 4px; }
+.barline-editor.blm.embedded { padding: 6px 0 4px; }
+.blm.embedded .blm-grid { min-height: 0; max-height: none; overflow: visible; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: 150px; }
+.blm.embedded .blm-cover-wrap { flex-basis: 94px; height: 94px; }
+.blm-card.current { border-color: color-mix(in srgb, var(--bl-accent) 60%, transparent); }
+.blm-title em { margin-right: 6px; padding: 0 6px; border-radius: 999px; font-style: normal; font-size: 10px; color: #fff; background: var(--bl-accent); }

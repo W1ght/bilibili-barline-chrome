@@ -1,0 +1,134 @@
+/* ---------- Design tokens: one look for dialogs, score panel and toasts ---------- */
+.barline-ui {
+  --bl-bg: #ffffff;
+  --bl-surface: #f6f7f9;
+  --bl-surface-2: #eceef2;
+  --bl-border: #e3e5e7;
+  --bl-border-strong: #c9ccd0;
+  --bl-text: #18191c;
+  --bl-text-2: #61666d;
+  --bl-text-3: #9499a0;
+  --bl-accent: #00aeec;
+  --bl-accent-strong: #0095cc;
+  --bl-accent-soft: #e3f6fd;
+  --bl-danger: #f25d59;
+  --bl-danger-soft: #feeceb;
+  --bl-ok: #1a9a52;
+  --bl-ok-soft: #e7f6ed;
+  --bl-warn: #b86200;
+  --bl-warn-soft: #fff4e5;
+  --bl-shadow: 0 12px 40px rgba(0, 0, 0, .16), 0 2px 6px rgba(0, 0, 0, .06);
+  --bl-radius: 12px;
+  --bl-radius-sm: 8px;
+  --bl-font: 13px/1.55 system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color-scheme: light;
+  color: var(--bl-text);
+  font: var(--bl-font);
+  text-align: left;
+  letter-spacing: 0;
+}
+@media (prefers-color-scheme: dark) {
+  .barline-ui {
+    --bl-bg: #1e2024;
+    --bl-surface: #26292e;
+    --bl-surface-2: #30343a;
+    --bl-border: #363a41;
+    --bl-border-strong: #4a4f57;
+    --bl-text: #e7e9ec;
+    --bl-text-2: #a8adb4;
+    --bl-text-3: #7c828a;
+    --bl-accent-soft: #0f3341;
+    --bl-danger-soft: #3d2120;
+    --bl-ok: #4cc47f;
+    --bl-ok-soft: #173326;
+    --bl-warn: #f0a043;
+    --bl-warn-soft: #3a2c17;
+    --bl-shadow: 0 12px 40px rgba(0, 0, 0, .5);
+    color-scheme: dark;
+  }
+}
+.barline-ui *, .barline-ui *::before, .barline-ui *::after { box-sizing: border-box; }
+
+/* ---------- Buttons ---------- */
+.barline-ui button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  height: 30px; padding: 0 12px; margin: 0;
+  font: 500 13px/1 system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  color: var(--bl-text); background: var(--bl-surface); border: 1px solid var(--bl-border); border-radius: var(--bl-radius-sm);
+  cursor: pointer; white-space: nowrap; transition: background .12s, border-color .12s, color .12s;
+}
+.barline-ui button:hover:not(:disabled) { border-color: var(--bl-accent); color: var(--bl-accent); }
+.barline-ui button:focus-visible { outline: 2px solid var(--bl-accent); outline-offset: 1px; }
+.barline-ui button:disabled { opacity: .45; cursor: not-allowed; }
+.barline-ui button.primary { color: #fff; background: var(--bl-accent); border-color: var(--bl-accent); }
+.barline-ui button.primary:hover:not(:disabled) { color: #fff; background: var(--bl-accent-strong); border-color: var(--bl-accent-strong); }
+.barline-ui button.ghost { background: transparent; border-color: transparent; color: var(--bl-text-2); }
+.barline-ui button.ghost:hover:not(:disabled) { background: var(--bl-surface); border-color: transparent; color: var(--bl-accent); }
+.barline-ui button.danger { color: var(--bl-danger); }
+.barline-ui button.danger:hover:not(:disabled) { color: var(--bl-danger); background: var(--bl-danger-soft); border-color: transparent; }
+.barline-ui button.small { height: 24px; padding: 0 8px; font-size: 12px; border-radius: 6px; }
+.barline-ui button.active { color: var(--bl-accent); border-color: var(--bl-accent); background: var(--bl-accent-soft); }
+
+/* ---------- Inputs ---------- */
+.barline-ui input:not([type]), .barline-ui input[type=text], .barline-ui input[type=number], .barline-ui select {
+  height: 30px; min-width: 0; padding: 0 8px; margin: 0;
+  font: 13px system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif; font-variant-numeric: tabular-nums;
+  color: var(--bl-text); background: var(--bl-bg); border: 1px solid var(--bl-border-strong); border-radius: var(--bl-radius-sm);
+  outline: none; transition: border-color .12s, box-shadow .12s;
+}
+.barline-ui input:focus, .barline-ui select:focus { border-color: var(--bl-accent); box-shadow: 0 0 0 3px var(--bl-accent-soft); }
+.barline-ui input:disabled, .barline-ui select:disabled { opacity: .55; }
+.barline-ui input[type=number] { appearance: textfield; }
+.barline-ui input[type=number]::-webkit-inner-spin-button, .barline-ui input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.barline-ui input[type=checkbox] { appearance: auto; width: 15px; height: 15px; margin: 0; accent-color: var(--bl-accent); cursor: pointer; }
+.barline-ui input[type=color] { width: 30px; height: 30px; padding: 2px; border: 1px solid var(--bl-border-strong); border-radius: var(--bl-radius-sm); background: var(--bl-bg); cursor: pointer; }
+
+/* ---------- Layout primitives ---------- */
+.barline-ui .bl-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 8px 0; }
+.barline-ui .bl-field { display: inline-flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--bl-text-2); }
+.barline-ui .bl-input-group { display: inline-flex; align-items: center; }
+.barline-ui .bl-input-group > * { border-radius: 0; margin-left: -1px; }
+.barline-ui .bl-input-group > :first-child { border-radius: var(--bl-radius-sm) 0 0 var(--bl-radius-sm); margin-left: 0; }
+.barline-ui .bl-input-group > :last-child { border-radius: 0 var(--bl-radius-sm) var(--bl-radius-sm) 0; }
+.barline-ui .bl-input-group > b { display: inline-flex; align-items: center; height: 30px; padding: 0 6px; color: var(--bl-text-3); border: 1px solid var(--bl-border-strong); background: var(--bl-surface); font-weight: 400; }
+.barline-ui .bl-input-group input:not([type]), .barline-ui .bl-input-group input[type=number] { width: 72px; }
+.barline-ui .bl-input-group > *:focus { position: relative; z-index: 1; }
+.barline-ui .bl-seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--bl-surface-2); border-radius: var(--bl-radius-sm); }
+.barline-ui .bl-seg button { height: 26px; border: 0; background: transparent; color: var(--bl-text-2); border-radius: 6px; }
+.barline-ui .bl-seg button:hover:not(:disabled) { color: var(--bl-text); background: transparent; }
+.barline-ui .bl-seg button.active { color: var(--bl-text); background: var(--bl-bg); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.barline-ui .bl-check { display: flex; align-items: flex-start; gap: 8px; margin: 8px 0; cursor: pointer; color: var(--bl-text); }
+.barline-ui .bl-check input { margin-top: 2px; flex-shrink: 0; }
+.barline-ui .bl-check small { display: block; color: var(--bl-text-3); font-size: 12px; }
+.barline-ui .bl-note { margin: 6px 0; padding: 0; color: var(--bl-text-2); font-size: 12px; line-height: 1.6; }
+.barline-ui .bl-note.ok, .barline-ui .bl-note.warn { padding: 6px 10px; border-radius: var(--bl-radius-sm); }
+.barline-ui .bl-note.ok { color: var(--bl-ok); background: var(--bl-ok-soft); }
+.barline-ui .bl-note.warn { color: var(--bl-warn); background: var(--bl-warn-soft); }
+.barline-ui .bl-muted { color: var(--bl-text-3); font-size: 12px; }
+.barline-ui .bl-empty { margin: 12px 0; color: var(--bl-text-3); font-size: 12px; text-align: center; }
+.barline-ui .bl-tag { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 500; white-space: nowrap; background: var(--bl-surface-2); color: var(--bl-text-2); }
+.barline-ui .bl-tag.ok { background: var(--bl-ok-soft); color: var(--bl-ok); }
+.barline-ui .bl-tag.warn { background: var(--bl-warn-soft); color: var(--bl-warn); }
+.barline-ui .bl-chip { --chip: var(--bl-accent); height: 26px; padding: 0 10px; border-radius: 999px; color: var(--chip); background: transparent; border: 1px solid color-mix(in srgb, var(--chip) 45%, transparent); }
+.barline-ui .bl-chip:hover:not(:disabled) { color: var(--chip); border-color: var(--chip); background: color-mix(in srgb, var(--chip) 10%, transparent); }
+.barline-ui .bl-chip.active { color: #fff; background: var(--chip); border-color: var(--chip); }
+.barline-ui kbd { padding: 0 5px; border: 1px solid var(--bl-border-strong); border-bottom-width: 2px; border-radius: 4px; font: 11px ui-monospace, Consolas, monospace; color: var(--bl-text-2); background: var(--bl-surface); }
+
+/* ---------- Player control bar ---------- */
+.barline-chrome-toolbar { position: relative; display: flex; align-items: center; flex-shrink: 0; order: 99; gap: 0; margin-left: 6px; padding: 0; background: transparent; color: #fff; height: 100%; }
+.barline-chrome-toolbar button { position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: 26px; min-width: 26px; height: 100%; margin: 0; border: 0; border-radius: 0; padding: 0; background: transparent; color: #fff; font: 500 12px system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif; cursor: pointer; opacity: .9; transition: color .12s, opacity .12s; }
+.barline-chrome-toolbar button:hover, .barline-chrome-toolbar button:focus-visible { color: #00aeec; opacity: 1; }
+.barline-chrome-toolbar .be-icon, .barline-chrome-toolbar svg { display: block; width: 22px; height: 22px; fill: currentColor; }
+.barline-chrome-toolbar svg[fill='none'] { fill: none; }
+.barline-chrome-toolbar button[data-name=barLineMarkStart], .barline-chrome-toolbar button[data-name=barLineMarkNext] { width: auto; min-width: 0; padding: 0 5px; }
+.barline-chrome-toolbar button[data-name=barLinePanel] { width: 30px; min-width: 30px; }
+.barline-chrome-toolbar .barline-button-label { display: inline-flex; align-items: center; height: 20px; padding: 0 2px; border-radius: 4px; }
+.barline-chrome-volume { display: none; position: absolute; top: auto; bottom: 100%; left: 50%; transform: translateX(-50%); z-index: 10; }
+.barline-chrome-toolbar button:hover .barline-chrome-volume { display: flex; }
+.barline-chrome-toolbar .barline-chrome-volume { background: rgba(21, 21, 21, .92); border-radius: 8px; padding: 10px 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, .35); backdrop-filter: blur(6px); }
+
+/* ---------- Toast ---------- */
+.barline-toast { position: fixed; bottom: 72px; left: 50%; z-index: 2147483647; display: flex; flex-direction: column; gap: 2px; max-width: min(520px, 90vw); padding: 10px 16px; transform: translateX(-50%); color: #fff; background: rgba(24, 25, 28, .92); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, .3); backdrop-filter: blur(8px); font: 13px/1.5 system-ui, 'PingFang SC', 'Microsoft YaHei', sans-serif; animation: barline-toast-in .18s ease-out; pointer-events: none; }
+.barline-toast b { font-size: 12px; font-weight: 600; color: #6fd3f7; }
+.barline-toast.leaving { opacity: 0; transform: translate(-50%, 6px); transition: opacity .18s, transform .18s; }
+@keyframes barline-toast-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translateX(-50%); } }
