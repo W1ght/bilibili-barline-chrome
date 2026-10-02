@@ -16,7 +16,7 @@ C:\Users\Wight\Documents\Codex\2026-09-28\https-github-com-m1ku666-bilibili-evol
 
 ### ZIP 安装方式
 
-1. 解压 `bilibili-barline-chrome.zip` 到固定文件夹。
+1. 从 GitHub [Releases](https://github.com/W1ght/bilibili-barline-chrome/releases) 下载 `bilibili-barline-chrome-版本号.zip`，解压到固定文件夹。
 2. 在 Chrome 地址栏输入 `chrome://extensions`，打开右上角「开发者模式」。
 3. 点击「加载已解压的扩展程序」，选择包含 `manifest.json` 的文件夹。
 4. 刷新已经打开的 B 站视频页。鼠标移入播放器，底部播放时间右侧显示小节线按钮；悬停图标可查看名称。最左边的图标打开「小节线面板」。
@@ -99,6 +99,17 @@ npm run build
 ```
 
 `dist/` 是可直接加载的扩展。Vue 模板在构建时预编译，Vue 运行时及样式均打包在本地。`src/chrome-adapter.ts` 替代原框架接口，`src/storage.ts` 替代 GM 存储，`public/` 包含 Manifest、后台和工具栏弹出页。
+
+### 发布
+
+`.github/workflows/release.yml`：同步修改 `package.json` 和 `public/manifest.json` 的版本号并提交，然后推送同名标签即可自动测试、构建、打包 ZIP 并发布到 GitHub Releases：
+
+```sh
+git tag v1.9.0
+git push origin v1.9.0
+```
+
+标签与 manifest 版本不一致时工作流会失败。也可以在 Actions 页手动运行，按当前 manifest 版本发布（已存在的 Release 会替换 ZIP）。
 
 ## 来源
 
