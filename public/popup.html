@@ -1,51 +1,36 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>B站音乐小节线</title>
 <style>
-:root{--bg:#fff;--surface:#f6f7f9;--border:#e3e5e7;--text:#18191c;--muted:#61666d;--faint:#9499a0;--accent:#00aeec;--accent-soft:#e3f6fd;color-scheme:light}
+:root{--bg:#fff;--surface:#f6f7f9;--border:#e3e5e7;--text:#18191c;--muted:#61666d;--faint:#9499a0;--accent:#00aeec;--accent-strong:#0095cc;--accent-soft:#e3f6fd;color-scheme:light}
 @media (prefers-color-scheme:dark){:root{--bg:#1e2024;--surface:#26292e;--border:#363a41;--text:#e7e9ec;--muted:#a8adb4;--faint:#7c828a;--accent-soft:#0f3341;color-scheme:dark}}
 *{box-sizing:border-box}
-body{width:330px;margin:0;background:var(--bg);color:var(--text);font:13px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
-header{display:flex;align-items:center;gap:10px;padding:16px 16px 10px}
+body{width:310px;margin:0;background:var(--bg);color:var(--text);font:13px/1.55 system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+header{display:flex;align-items:center;gap:10px;padding:16px 16px 12px}
 .logo{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:var(--accent);color:#fff;font-size:17px}
 h1{margin:0;font-size:15px}header p{margin:0;color:var(--faint);font-size:11px}
-.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:0 16px 12px}
-.actions button{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font:500 12px system-ui,"PingFang SC",sans-serif;cursor:pointer}
-.actions button span{font-size:18px;line-height:1}
-.actions button:hover{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
-.hint{margin:-4px 16px 10px;color:var(--faint);font-size:11px}#status{margin:0 16px 10px;color:var(--faint);font-size:12px;min-height:0}
-#status:empty{display:none}
-section{margin:0 16px 12px;padding:4px 12px;border:1px solid var(--border);border-radius:10px}
-section h2{margin:8px 0 2px;font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--faint)}
-.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--border)}
-section h2+.opt{border-top:0}
+#open{display:block;width:calc(100% - 32px);height:40px;margin:0 16px 6px;border:0;border-radius:10px;background:var(--accent);color:#fff;font:600 14px system-ui,"PingFang SC",sans-serif;cursor:pointer}
+#open:hover{background:var(--accent-strong)}
+.hint{margin:0 16px 12px;color:var(--faint);font-size:11px}
+#status{margin:0 16px 10px;color:#b86200;font-size:12px}#status:empty{display:none}
+section{margin:0 16px 12px;padding:2px 12px;border:1px solid var(--border);border-radius:10px}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
+.opt:first-child{border-top:0}.opt[hidden]{display:none}
 .opt span{display:flex;flex-direction:column}.opt small{color:var(--faint);font-size:11px}
 select{height:26px;padding:0 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font:12px system-ui,sans-serif}
 .switch{position:relative;flex-shrink:0;width:34px;height:20px;margin:0;appearance:none;border-radius:999px;background:var(--border);cursor:pointer;transition:background .15s}
 .switch::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #0003;transition:transform .15s}
 .switch:checked{background:var(--accent)}.switch:checked::after{transform:translateX(14px)}
-.keys{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;padding:6px 0 8px;font-size:12px;color:var(--muted)}
-kbd{justify-self:start;padding:0 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;font:11px ui-monospace,Consolas,monospace;color:var(--text);background:var(--surface)}
-footer{padding:0 16px 14px;color:var(--faint);font-size:11px}
+footer{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;padding:0 16px 14px;color:var(--faint);font-size:11px}
+kbd{justify-self:start;padding:0 5px;border:1px solid var(--border);border-bottom-width:2px;border-radius:4px;font:11px ui-monospace,Consolas,monospace;color:var(--muted);background:var(--surface)}
 </style></head><body>
 <header><div class="logo">♪</div><div><h1>B站音乐小节线</h1><p>节拍器 · 小节循环 · 抄谱</p></div></header>
-<div class="actions">
-  <button id="edit"><span>♩</span>节拍设置</button>
-  <button id="score"><span>♪</span>抄谱</button>
-  <button id="manage"><span>☰</span>管理</button>
-</div>
-<p class="hint">三项都在播放器底部的「小节线面板」里，点击后直接打开对应标签页。</p><p id="status" role="status"></p>
-<section><h2>循环练习</h2>
-  <label class="opt"><span>每遍加速<small>循环一遍后自动提速</small></span><select id="loopSpeedStep" data-type="number"><option value="0">关闭</option><option value="0.02">2%</option><option value="0.05">5%</option><option value="0.1">10%</option></select></label>
-  <label class="opt"><span>加速到</span><select id="loopSpeedTarget" data-type="number"><option value="1">1.0×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2.0×</option></select></label>
-  <label class="opt"><span>循环时不打预备拍</span><input class="switch" type="checkbox" id="loopDisableCountIn"></label>
-  <label class="opt"><span>预备拍使用最大音量</span><input class="switch" type="checkbox" id="countInMaxVolume"></label>
-</section>
-<section><h2>控制</h2>
+<button id="open" data-action="open">打开小节线面板</button>
+<p class="hint">也可以点播放器底部最左边的图标。</p><p id="status" role="status"></p>
+<section>
   <label class="opt"><span>方向键跳小节<small>选 Shift 可保留 B 站快进快退</small></span><select id="arrowKeys"><option value="plain">← →</option><option value="shift">Shift + ← →</option><option value="off">关闭</option></select></label>
-  <label class="opt"><span>隐藏上一/下一小节按钮</span><input class="switch" type="checkbox" id="hideBarNavButtons"></label>
-  <label class="opt"><span>节拍器按钮弹窗设置音量</span><input class="switch" type="checkbox" id="promptMetronomeVolume"></label>
+  <label class="opt"><span>循环时逐遍加速</span><select id="loopSpeedStep" data-type="number"><option value="0">关闭</option><option value="0.02">每遍 +2%</option><option value="0.05">每遍 +5%</option><option value="0.1">每遍 +10%</option></select></label>
+  <label class="opt" id="targetRow"><span>加速到</span><select id="loopSpeedTarget" data-type="number"><option value="1">1.0×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2.0×</option></select></label>
+  <label class="opt"><span>循环前打预备拍</span><input class="switch" type="checkbox" id="loopDisableCountIn" data-invert></label>
+  <label class="opt"><span>显示跳小节按钮<small>第一拍 / 上一节 / 下一节</small></span><input class="switch" type="checkbox" id="hideBarNavButtons" data-invert></label>
 </section>
-<section><h2>快捷键</h2>
-  <div class="keys"><kbd>Alt+1</kbd><span>标记小节起点</span><kbd>Alt+2</kbd><span>标记下一小节（可连续）</span><kbd>Alt+L</kbd><span>设置 / 关闭循环</span><kbd>Alt+M</kbd><span>节拍器开关</span></div>
-</section>
-<footer>配置保存在本机浏览器，可在面板的「管理」中导出备份。</footer>
+<footer><kbd>Alt+1</kbd><span>小节起点</span><kbd>Alt+2</kbd><span>下一小节（可连续）</span><kbd>Alt+L</kbd><span>循环起点 / 终点 / 关闭</span><kbd>Alt+M</kbd><span>节拍器开关</span></footer>
 <script src="popup.js"></script></body></html>

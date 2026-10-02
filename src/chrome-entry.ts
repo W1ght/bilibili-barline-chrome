@@ -12,10 +12,10 @@ async function main() {
   initScorePanel()
   addData('ui.icons', icons => { icons['chrome-panel'] = panelIcon })
   // One entry for everything: settings, score, chapters, practice and the library live in the panel.
-  addControlBarButton({ name: 'barLinePanel', displayName: '小节线面板：节拍设置、抄谱、段落、练习、管理', icon: 'chrome-panel', order: 0, action: () => openScorePanel() })
+  addControlBarButton({ name: 'barLinePanel', displayName: '小节线面板：节拍、抄谱、段落与练习', icon: 'chrome-panel', order: 0, action: () => openScorePanel() })
   addControlBarButton({ name: 'barLineMarkStart', displayName: '标记小节起点（Alt+1）', label: '起点', icon: '', order: 1.1, action: markBarStart })
   addControlBarButton({ name: 'barLineMarkNext', displayName: '标记下一小节，可连续标记多个（Alt+2）', label: '下一节', icon: '', order: 1.2, action: markNextBar })
-  const tabs: Record<string, string> = { edit: 'bars', score: 'capture', manage: 'library', chapters: 'chapters' }
+  const tabs: Record<string, string> = { open: '', edit: 'bars', score: 'capture', manage: 'library', chapters: 'practice' }
   chrome.runtime.onMessage.addListener((message, _sender, reply) => {
     if (message?.type !== 'barline-action') return
     if (!hasVideo() || !openScorePanel(tabs[message.action])) { reply({ ok: false }); return }

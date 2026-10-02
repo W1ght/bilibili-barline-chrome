@@ -16,7 +16,8 @@ body.barline-active.barline-configured .be-video-control-bar-extend-item[data-na
 body.barline-active.barline-configured.barline-metronome-on .be-video-control-bar-extend-item[data-name='barLineMetronome'] .be-icon {
   color: #ff8a3d;
 }
-/* 「隐藏上下小节按钮」 */
+/* 小节跳转按钮默认隐藏（方向键 / 触屏滑动可代替），弹出页可打开 */
+body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineFirst'],
 body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLinePrev'],
 body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineNext'] {
   display: none !important;
@@ -51,7 +52,8 @@ body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineNe
 .ble-mark b { font: 500 11px ui-monospace, Consolas, monospace; color: var(--bl-text); }
 
 .ble-table { margin-top: 8px; border: 1px solid var(--bl-border); border-radius: var(--bl-radius-sm); overflow: hidden; }
-.ble-tr { display: grid; grid-template-columns: 30px 84px 150px 1fr 28px; align-items: center; gap: 8px; padding: 6px 10px; }
+.ble-tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 10px; }
+.ble-tr > .sp-icon { margin-left: auto; }
 .ble-th { padding-top: 4px; padding-bottom: 4px; font-size: 12px; color: var(--bl-text-2); background: var(--bl-surface); border-bottom: 1px solid var(--bl-border); }
 .barline-ui .ble-th button.ghost { justify-content: flex-start; padding: 0 4px; color: var(--bl-text-2); font-weight: 600; }
 .ble-tbody { max-height: 228px; overflow-y: auto; }
@@ -65,8 +67,8 @@ body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineNe
 .barline-ui .ble-tr .bl-input-group > b { font-size: 12px; white-space: nowrap; }
 .barline-ui .ble-add { width: 100%; height: 34px; margin-top: 10px; color: var(--bl-text-2); background: transparent; border: 1px dashed var(--bl-border-strong); }
 
-.ble-tap { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 18px; }
-.barline-ui .ble-tap-btn { flex-direction: column; gap: 3px; width: 128px; height: 76px; border: 2px solid var(--bl-accent); border-radius: 14px; color: var(--bl-accent); background: var(--bl-accent-soft); font-size: 16px; font-weight: 600; user-select: none; }
+.ble-tap { display: flex; align-items: center; gap: 16px; }
+.barline-ui .ble-tap-btn { flex-direction: column; gap: 3px; width: 128px; height: 64px; border: 2px solid var(--bl-accent); border-radius: 14px; color: var(--bl-accent); background: var(--bl-accent-soft); font-size: 16px; font-weight: 600; user-select: none; }
 .barline-ui .ble-tap-btn small { font-size: 11px; font-weight: 400; color: var(--bl-text-2); }
 .barline-ui .ble-tap-btn:active:not(:disabled) { transform: scale(.97); }
 .ble-tap-value { display: flex; flex-direction: column; align-items: center; min-width: 72px; }
@@ -79,12 +81,33 @@ body.barline-hide-bar-nav .be-video-control-bar-extend-item[data-name='barLineNe
 .ble-actions { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .barline-ui .ble-actions button.primary { min-width: 84px; }
 
-@container (max-width: 540px) {
-  .ble-tr { grid-template-columns: 24px 70px 1fr 24px; }
-  .ble-tr > :nth-child(4) { grid-column: 2 / 4; }
-  .ble-th > :nth-child(4) { display: none; }
-  .ble-tap { grid-template-columns: auto 1fr; }
-  .ble-tap-side { grid-column: 1 / -1; }
+/* Hero: the one number that matters, editable in place */
+.ble-hero { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; padding: 12px 14px; border-radius: var(--bl-radius); background: var(--bl-surface); }
+.ble-hero-bpm { display: inline-flex; align-items: baseline; gap: 6px; cursor: text; }
+.barline-ui .ble-hero-bpm input[type=number] { field-sizing: content; width: auto; min-width: 3ch; height: 40px; padding: 0 4px; font-size: 30px; font-weight: 700; border-color: transparent; background: transparent; }
+.barline-ui .ble-hero-bpm input[type=number]:hover { border-color: var(--bl-border-strong); }
+.barline-ui .ble-hero-bpm input[type=number]:focus { background: var(--bl-bg); }
+.ble-hero-bpm span { color: var(--bl-text-2); font-size: 12px; }
+.barline-ui .ble-hero-meter input[type=number] { width: 44px; text-align: center; }
+.barline-ui .ble-hero-meter select { width: 52px; }
+.ble-first { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: var(--bl-text-2); }
+.ble-first b { margin: 0 2px; font: 500 12px ui-monospace, Consolas, monospace; color: var(--bl-text); }
+.barline-ui .ble-first button { width: 24px; padding: 0; font-size: 15px; }
+
+/* Secondary features live behind one disclosure */
+.ble-more { margin: 2px 0 10px; }
+.ble-more > summary { display: flex; align-items: center; gap: 6px; padding: 6px 2px; color: var(--bl-text-2); font-size: 12px; cursor: pointer; list-style: none; user-select: none; }
+.ble-more > summary::-webkit-details-marker { display: none; }
+.ble-more > summary::before { content: '▸'; font-size: 10px; transition: transform .15s; }
+.ble-more[open] > summary::before { transform: rotate(90deg); }
+.ble-more > summary:hover { color: var(--bl-accent); }
+.ble-sub { margin: 4px 0 0; padding: 10px 0; border-top: 1px dashed var(--bl-border); }
+.ble-sub h4 { margin: 0 0 6px; font-size: 12px; font-weight: 600; color: var(--bl-text-2); }
+.ble-sub .ble-table { margin: 0 0 8px; }
+.barline-ui .ble-sub .ble-add { margin-top: 0; height: 30px; }
+
+@container (max-width: 420px) {
+  .ble-first { width: 100%; }
 }
 
 /* ---------- Manager ---------- */

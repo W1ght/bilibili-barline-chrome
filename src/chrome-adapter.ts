@@ -1,7 +1,8 @@
 export const identity: {aid?:string; cid?:string; bvid?:string} = {}
 export const defineComponentMetadata = <T>(value:T) => value
 export const defineOptionsMetadata = <T>(value:T) => value
-const defaults:Record<string,any> = {hideBarNavButtons:false, loopDisableCountIn:false, countInMaxVolume:true, promptMetronomeVolume:false, arrowKeys:'plain', loopSpeedStep:0, loopSpeedTarget:1}
+// Only what the popup exposes. Retired options (count-in volume, prompt-for-volume) fall back to their defaults in index.ts.
+const defaults:Record<string,any> = {hideBarNavButtons:true, loopDisableCountIn:false, arrowKeys:'plain', loopSpeedStep:0, loopSpeedTarget:1}
 export const settings = {options:{...defaults} as Record<string,any>}
 const listeners = new Map<string, Set<(v:any)=>void>>()
 export async function initOptions() {

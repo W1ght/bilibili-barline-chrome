@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "B站音乐小节线",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "为 B 站视频设置 BPM、变拍号、节拍器、小节跳转与片段循环。独立扩展，无需油猴。",
   "minimum_chrome_version": "111",
   "permissions": ["storage"],

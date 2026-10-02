@@ -3,8 +3,25 @@
     <header @pointerdown="dragPanel">
       <div class="sp-title"><span class="sp-logo" aria-hidden="true">♪</span><strong>音乐小节线</strong><span :class="['sp-sub',{set:!!barConfig}]">{{ tempoSummary }}</span></div>
       <div class="sp-head-actions">
-        <button class="sp-toggle" :class="{on:follow}" :aria-pressed="follow" @click="follow=!follow;queueSave()" title="播放时自动滚动到当前谱行">跟随</button>
-        <button class="sp-toggle" :class="{on:locked}" :aria-pressed="locked" @click="locked=!locked;queueSave()" title="锁定面板位置和大小">锁定</button>
+        <span class="sp-menu down" :class="{open:menuOpen}">
+          <button class="sp-icon" @click.stop="menuOpen=!menuOpen" :aria-expanded="menuOpen" title="更多" aria-label="更多">⋯</button>
+          <span class="sp-menu-list">
+            <label class="sp-menu-check"><input type="checkbox" v-model="follow" @change="queueSave()" />播放时跟随当前谱行</label>
+            <label class="sp-menu-check"><input type="checkbox" v-model="locked" @change="queueSave()" />锁定面板位置和大小</label>
+            <span class="sp-menu-offset" title="定位线整体提前或延后（例如蓝牙耳机延迟、视频音画不同步）">定位线偏移
+              <button class="ghost small" @click="nudgeOffset(-20)" aria-label="定位线提前 20 毫秒">−</button>
+              <button class="ghost small sp-offset-value" @click="form.offset=0" :title="form.offset ? '点击归零' : ''">{{ form.offset > 0 ? '+' : '' }}{{ form.offset }} ms</button>
+              <button class="ghost small" @click="nudgeOffset(20)" aria-label="定位线延后 20 毫秒">＋</button>
+            </span>
+            <hr />
+            <button @click="menuOpen=false;exportPng()" :disabled="!shownFrames.length || busy">导出长图 PNG</button>
+            <button @click="menuOpen=false;printScore()" :disabled="!shownFrames.length || busy">PDF / 打印</button>
+            <button @click="menuOpen=false;exportBackup()" :disabled="(!frames.length && !chapters.length) || busy">下载谱面备份</button>
+            <button @click="menuOpen=false;importBackup()" :disabled="busy || !!practiceFrames">恢复谱面备份…</button>
+            <hr />
+            <button @click="menuOpen=false;open('library')">所有视频的节拍配置…</button>
+          </span>
+        </span>
         <button class="sp-icon" @click="closePanel" title="收起面板" aria-label="收起面板">×</button>
       </div>
     </header>
@@ -23,41 +40,43 @@
       </button>
     </nav>
 
-    <div v-show="tab" class="sp-drawer" :class="{tall:!shownFrames.length || expanded}">
+    <div v-show="tab" class="sp-drawer" :class="{tall:tab && (!shownFrames.length || expanded)}">
       <div v-show="tab==='bars'" class="sp-bars">
-        <section class="ble-card sp-auto">
-          <div class="ble-card-head">
-            <h3>从谱面自动对齐</h3>
-            <span v-if="barAlign && barAlign.candidates" class="bl-tag" :class="barAlign.aligned ? 'ok' : 'warn'">{{ barAlign.aligned }} / {{ barAlign.candidates }} 行</span>
-          </div>
-          <template v-if="barAlign && barAlign.candidates">
-            <p class="bl-note">按识别到的小节线，把每行的时长平均分给各小节；定位线和节拍网格都由此得出。{{ barAlign.leadMeasured ? `已根据光标／校准行测得视频提前 ${barAlign.lead.toFixed(2)} 秒显示谱行，并修正了全部估算行。` : '在任意一行「校准」两个点，其余行会按它整体修正。' }}</p>
-            <details v-if="skippedRows.length" class="sp-skipped"><summary>{{ skippedRows.length }} 行未对齐（保持均匀估算）</summary><ul><li v-for="row in skippedRows" :key="row.index"><b>第 {{ row.index + 1 }} 行</b>{{ row.reason }}</li></ul></details>
-            <div class="bl-row">
-              <label class="bl-field sp-inline-field">拍号<span class="bl-input-group"><input aria-label="每小节拍数" type="number" min="1" max="32" v-model.number="form.numerator" :disabled="busy" /><b>/</b><select aria-label="拍号分母" v-model.number="form.denominator" :disabled="busy"><option v-for="d in [2,4,8,16]" :key="d" :value="d">{{ d }}</option></select></span></label>
-              <span v-if="alignBpm" class="sp-bpm"><b>{{ alignBpm.toFixed(1) }}</b> BPM</span>
-              <span class="sp-push"></span>
-              <button class="ghost" @click="realign(true)" :disabled="busy">重新对齐</button>
-              <button class="primary" @click="applyBarGridToMetronome" :disabled="busy || !barAlign || barAlign.bars.length < 3" title="把对齐得到的小节网格写入节拍器（变速处自动分段）">应用到节拍器</button>
-            </div>
-          </template>
-          <template v-else>
-            <p class="bl-note">{{ frames.length ? '这些谱行没有识别到贯穿谱线的小节线，无法自动对齐，可用下方「小节定速」手动设置。' : '先抄谱，插件会根据谱面上的小节线自动推算每个小节的时间和 BPM，不需要手动标记。' }}</p>
-            <div v-if="!frames.length" class="bl-row"><button class="primary" @click="toggleTab('capture')">去抄谱</button></div>
-          </template>
-          <div v-if="analysis" class="sp-audio">
-            <div class="bl-row"><b>音频分析</b><span class="sp-bpm"><b>{{ analysis.bpm.toFixed(1) }}</b> BPM</span><em :class="['bl-tag',confidenceClass]">{{ confidenceLabel }}可信度</em><span class="sp-push"></span><button class="small ghost" @click="exportTimeline" :disabled="busy">导出时间轴</button><button class="small" @click="applyAnalysis" :disabled="busy || !!practiceFrames">应用</button></div>
-            <div class="bl-row"><span class="bl-muted">候选</span><button v-for="candidate in analysis.candidates.slice(0,3)" :key="candidate.bpm" class="small" :class="{active:candidate.bpm===analysis.bpm}" @click="chooseTempo(candidate.bpm)" :disabled="busy">{{ candidate.bpm.toFixed(1) }}</button><span class="bl-muted">{{ analysis.variable ? '可能存在变速' : '' }}</span></div>
-          </div>
-        </section>
         <BarLineEditor ref="editor" embedded :video="video" :initial="barConfig || defaultConfig" :has-config="!!barConfig" :revision="barRevision"
-          :on-preview="previewConfig" :on-temp-mute="tempMuteMetronome" :on-delete="deleteCurrentConfig" />
+          :on-preview="previewConfig" :on-delete="deleteCurrentConfig">
+          <template #auto>
+            <section v-if="barAlign && barAlign.bars.length >= 3" class="ble-card sp-auto">
+              <div class="ble-card-head">
+                <h3>从谱面对齐</h3>
+                <span class="bl-tag" :class="barAlign.aligned ? 'ok' : 'warn'">{{ barAlign.aligned }} / {{ barAlign.candidates }} 行</span>
+              </div>
+              <div class="bl-row">
+                <span v-if="alignBpm" class="sp-bpm"><b>{{ alignBpm.toFixed(1) }}</b> BPM · {{ form.numerator }}/{{ form.denominator }} · {{ barAlign.bars.length - 1 }} 小节</span>
+                <span class="sp-push"></span>
+                <button class="primary" @click="applyBarGridToMetronome" :disabled="busy" title="把谱面小节线推算出的小节网格写入节拍器（变速处自动分段）">应用到节拍器</button>
+              </div>
+              <details v-if="skippedRows.length" class="sp-skipped"><summary>{{ skippedRows.length }} 行未对齐，按时间均匀估算</summary><ul><li v-for="row in skippedRows" :key="row.index"><b>第 {{ row.index + 1 }} 行</b>{{ row.reason }}</li></ul></details>
+            </section>
+            <button v-else-if="!frames.length && !barConfig" class="sp-cta" @click="toggleTab('capture')">
+              <b>有谱面的视频？先抄谱</b><span>插件按谱面上的小节线自动算出 BPM 和节拍，不用手动打点。</span>
+            </button>
+          </template>
+          <template #more>
+            <section v-if="analysis" class="ble-sub sp-audio">
+              <h4>音频分析</h4>
+              <div class="bl-row"><span class="sp-bpm"><b>{{ analysis.bpm.toFixed(1) }}</b> BPM</span><em :class="['bl-tag',confidenceClass]">{{ confidenceLabel }}可信度</em><span class="bl-muted">{{ analysis.variable ? '可能存在变速' : '' }}</span><span class="sp-push"></span><button class="small ghost" @click="exportTimeline" :disabled="busy">导出时间轴</button><button class="small" @click="applyAnalysis" :disabled="busy || !!practiceFrames">应用</button></div>
+              <div class="bl-row"><span class="bl-muted">候选</span><button v-for="candidate in analysis.candidates.slice(0,3)" :key="candidate.bpm" class="small" :class="{active:candidate.bpm===analysis.bpm}" @click="chooseTempo(candidate.bpm)" :disabled="busy">{{ candidate.bpm.toFixed(1) }}</button></div>
+            </section>
+          </template>
+        </BarLineEditor>
       </div>
-      <ScoreCaptureForm v-show="tab==='capture'" :form="form" :preview="preview" :crop-style="cropStyle" :crop-check="cropCheck" :busy="busy" :disabled="!!practiceFrames" :hint="scanHint" :clock="clock"
+      <ScoreCaptureForm v-show="tab==='capture'" :form="form" :preview="preview" :crop-style="cropStyle" :crop-check="cropCheck" :busy="busy" :disabled="!!practiceFrames" :hint="scanHint" :clock="clock" :duration="videoDuration()"
         @crop-start="startCrop" @crop-preset="setCrop" @refresh="refreshPreview()" @set-range="setRange" @now="setNow" @range="setQuickRange" @start="scan()" @import="importImages" />
-      <ScoreChapters v-show="tab==='chapters'" :chapters="chapters" :video="video" :busy="busy" :current-id="currentChapter && currentChapter.id" :clock="clock"
-        @change="chapters=$event;queueSave()" @jump="jumpChapter" @status="say" />
-      <PracticePanel v-show="tab==='practice'" :video="video" :frames="framesForPractice" :chapters="chapters" :key-id="keyId" :busy="busy" @status="say" @select="selectPractice" @open="tab='practice'" />
+      <div v-show="tab==='practice'" class="sp-practice-tab">
+        <ScoreChapters :chapters="chapters" :video="video" :busy="busy" :current-id="currentChapter && currentChapter.id" :clock="clock"
+          @change="chapters=$event;queueSave()" @jump="jumpChapter" @status="say" />
+        <PracticePanel :video="video" :frames="framesForPractice" :chapters="chapters" :key-id="keyId" :busy="busy" @status="say" @select="selectPractice" @open="tab='practice'" />
+      </div>
       <BarLineManager v-if="tab==='library'" embedded :current-key="barKey" />
     </div>
     <div v-if="scanning" class="sp-progress"><span><i :style="{width:(progress*100)+'%'}"></i></span><button class="small" @click="stopCapture">停止并保留</button></div>
@@ -72,11 +91,7 @@
       <template v-else-if="practiceFrames"><b>练习谱面</b>{{ active >= 0 ? `第 ${active+1} 行 · ${clock(time)}` : clock(time) }}</template>
       <template v-else-if="active >= 0"><b>第 {{ active + 1 }} / {{ shownFrames.length }} 行</b>{{ clock(time) }}<span :class="['bl-tag',modeClass(shownFrames[active])]">{{ rowMode(shownFrames[active]) }}</span></template>
       <template v-else>{{ frames.length ? '当前时间没有对应谱行' : '还没有谱面' }}</template>
-      <span class="sp-offset" title="定位线整体提前或延后（例如蓝牙耳机延迟、视频音画不同步）">
-        <button class="ghost small" @click="nudgeOffset(-20)" aria-label="定位线提前 20 毫秒">−</button>
-        <button class="ghost small sp-offset-value" @click="form.offset=0" :title="form.offset ? '点击归零' : '定位线偏移'">{{ form.offset > 0 ? '+' : '' }}{{ form.offset }} ms</button>
-        <button class="ghost small" @click="nudgeOffset(20)" aria-label="定位线延后 20 毫秒">＋</button>
-      </span>
+      <span v-if="form.offset" class="sp-push bl-muted" title="在右上角 ⋯ 中调整">偏移 {{ form.offset > 0 ? '+' : '' }}{{ form.offset }} ms</span>
     </div>
 
     <div class="score-pages" ref="pages">
@@ -86,14 +101,16 @@
           <input :aria-label="`第${index+1}行起始时间`" :value="clock(frame.time)" @change="changeTime(frame,$event)" :disabled="busy || !!practiceFrames" :title="'起始 '+frame.time.toFixed(3)+' 秒，可输入 m:ss 或秒数'" />
           <span class="sp-row-range">– {{ clock(frameEnd(index)) }}</span>
           <span :class="['bl-tag',modeClass(frame)]">{{ rowMode(frame) }}</span>
-          <span class="sp-row-actions">
-            <button class="ghost small" @click="video.currentTime=frame.time" :disabled="busy" title="跳到这一行">跳转</button>
-            <template v-if="!practiceFrames">
-              <button class="ghost small" @click="setStartNow(frame)" :disabled="busy" title="把这一行的起点设为视频当前时间">起点=当前</button>
-              <button class="ghost small" @click="rescanRow(index)" :disabled="busy" title="只重新抄写这一行的时间段">重抄</button>
-              <button class="ghost small" @click="resetAnchors(frame)" :disabled="busy || !frame.anchors.length" title="清除这一行的定位点">清定位</button>
-              <button class="ghost small danger" @click="removeFrame(frame)" :disabled="busy" title="删除这一行">删除</button>
-            </template>
+          <span v-if="!practiceFrames" class="sp-row-actions">
+            <button class="ghost small" @click="rescanRow(index)" :disabled="busy" title="只重新抄写这一行的时间段">重抄</button>
+            <span class="sp-menu down" :class="{open:rowMenu===frame.id}">
+              <button class="ghost small" @click.stop="rowMenu=rowMenu===frame.id?'':frame.id" :disabled="busy" aria-label="更多操作" title="更多操作">⋯</button>
+              <span class="sp-menu-list" @click="rowMenu=''">
+                <button @click="setStartNow(frame)">起点设为当前时间</button>
+                <button @click="resetAnchors(frame)" :disabled="!frame.anchors.length">清除定位点</button>
+                <button class="danger" @click="removeFrame(frame)">删除这一行</button>
+              </span>
+            </span>
           </span>
         </div>
         <div class="score-image-wrap" :class="{calibrating}" @click="clickScore(frame,index,$event)">
@@ -105,25 +122,18 @@
       </article>
       <div v-if="!frames.length && !practiceFrames && !tab" class="sp-empty">
         <b>还没有谱面</b>
-        <span>在「抄谱」里框选谱面区域，点「开始抄谱」自动生成；也可以暂停在某一行，点下方「补截」。</span>
+        <span>在「抄谱」里框一下谱面，点「开始抄谱」即可自动生成，节拍也会顺带算好。</span>
         <button class="primary" @click="tab='capture'">去抄谱</button>
       </div>
     </div>
 
     <footer>
       <button class="sp-play" @click="togglePlay" :disabled="busy" :title="video.paused?'播放':'暂停'">{{ video.paused ? '▶ 播放' : '❚❚ 暂停' }}</button>
-      <button @click="captureOne" :disabled="busy || !!practiceFrames" title="把当前画面补成一行谱面">补截</button>
-      <button class="sp-toggle" :class="{on:calibrating}" :aria-pressed="calibrating" @click="calibrating=!calibrating" :disabled="!!practiceFrames || !frames.length" title="点击谱图绑定当前视频时间">校准</button>
+      <template v-if="frames.length && !practiceFrames">
+        <button class="ghost" @click="captureOne" :disabled="busy" title="把当前画面补成一行谱面">补截</button>
+        <button class="sp-toggle" :class="{on:calibrating}" :aria-pressed="calibrating" @click="calibrating=!calibrating" title="定位线不准时：暂停在某个音符上，点击谱图中对应位置">校准定位线</button>
+      </template>
       <span class="sp-push"></span>
-      <span class="sp-menu" :class="{open:menuOpen}">
-        <button class="ghost" @click.stop="menuOpen=!menuOpen" :aria-expanded="menuOpen">导出 ▾</button>
-        <span class="sp-menu-list" @click="menuOpen=false">
-          <button @click="exportPng" :disabled="!shownFrames.length || busy">导出长图 PNG</button>
-          <button @click="printScore" :disabled="!shownFrames.length || busy">PDF / 打印</button>
-          <button @click="exportBackup" :disabled="(!frames.length && !chapters.length) || busy">下载备份</button>
-          <button @click="importBackup" :disabled="busy || !!practiceFrames">恢复备份…</button>
-        </span>
-      </span>
       <span class="sp-count">{{ frames.length }} 行</span>
     </footer>
     <div v-if="!locked" class="score-resize" @pointerdown="resizePanel" title="拖动调整谱窗大小"></div>
@@ -137,7 +147,7 @@ import {captureScore,ScoreShot,FrameSampler,playScan,seekFrame,scoreRequest,down
 import {ScoreSegmenter,ScanRow,InkMask,sensitivities,defaultSegmentOptions,fitCursorAnchors,mergeScanned} from './score-segment'
 import {AnalysisResult,analyzeTempo,visualBarTimes,alignEstimatedRows} from './score-analysis'
 import {AudioOnsets} from './score-audio'
-import {applyAnalyzedTempo,applyBarGrid,suspendForScoreAnalysis,onBarState,previewConfig,tempMuteMetronome,deleteCurrentConfig} from './index'
+import {applyAnalyzedTempo,applyBarGrid,suspendForScoreAnalysis,onBarState,previewConfig,deleteCurrentConfig} from './index'
 import {BarAlignResult,autoAlignBars,applyBarAlignment,barGridSegments} from './bar-align'
 import {parseTime,BarConfig,DEFAULT_CONFIG} from './config'
 import {Chapter,validateChapters,chapterAt} from './score-chapters'
@@ -158,7 +168,7 @@ export default Vue.extend({
   props:{video:{type:Object,required:true},keyId:{type:String,required:true}},
   data(){return {
     visible:false,locked:false,follow:true,calibrating:false,busy:false,scanning:false,progress:0,ready:false,preview:'',
-    status:'',statusKind:'info' as 'info'|'ok'|'warn',tab:'' as Tab,menuOpen:false,
+    status:'',statusKind:'info' as 'info'|'ok'|'warn',tab:'' as Tab,menuOpen:false,rowMenu:'',
     form:{start:0,end:0,rate:4,sensitivity:'normal',withAudio:false,clean:true,numerator:4,denominator:4,autoApply:true,offset:0},
     barAlign:null as BarAlignResult|null,expanded:false,
     barConfig:null as BarConfig|null,barKey:'',barRevision:0,defaultConfig:DEFAULT_CONFIG,offBar:null as (()=>void)|null,
@@ -173,7 +183,9 @@ export default Vue.extend({
     framesForPractice():ScoreFrame[]{return this.frames.map((f,i)=>({...f,end:f.end??this.frames[i+1]?.time??this.video.duration}))},
     currentChapter():Chapter|null{return chapterAt(this.chapters,this.time)},
     tabs():{id:Tab;label:string;badge?:string|number}[]{
-      return [{id:'bars',label:'小节线'},{id:'capture',label:'抄谱',badge:this.frames.length||''},{id:'chapters',label:'段落',badge:this.chapters.length||''},{id:'practice',label:'练习'},{id:'library',label:'管理'}]
+      const tabs:{id:Tab;label:string;badge?:string|number}[]=[{id:'bars',label:'节拍'},{id:'capture',label:'抄谱',badge:this.frames.length||''},{id:'practice',label:'段落与练习',badge:this.chapters.length||''}]
+      if(this.tab==='library')tabs.push({id:'library',label:'所有视频'})
+      return tabs
     },
     tempoSummary():string{
       const c=this.barConfig;if(!c)return '未设置节拍'
@@ -188,7 +200,7 @@ export default Vue.extend({
     scanHint():string{
       const f=this.form,span=Math.max(0,Math.min(f.end,this.videoDuration())-f.start),rate=f.withAudio?1:f.rate
       const replaced=this.frames.filter(r=>r.time>=f.start-.001&&r.time<f.end).length
-      return `播放 ${clock(f.start)}–${clock(f.end)}，约 ${Math.ceil(span/rate)} 秒。${replaced?`替换此范围内的 ${replaced} 行，`:''}范围外的谱行保留；结束后回到原进度。`
+      return `${rate===1?'原速有声':`${rate}× 静音`}播放约 ${Math.ceil(span/rate)} 秒，结束后回到原进度${replaced?`；替换范围内已有的 ${replaced} 行`:''}。`
     },
   },
   watch:{
@@ -197,7 +209,7 @@ export default Vue.extend({
   },
   async mounted(){
     savedImages.set(this,new Map())
-    this.offBar=onBarState((state,source)=>{this.barConfig=state.config;this.barKey=state.key;if(source!=='editor')this.barRevision++})
+    this.offBar=onBarState((state,source)=>{this.barConfig=state.config;this.barKey=state.key;this.syncMeter();if(source!=='editor')this.barRevision++})
     window.addEventListener('resize',this.clampPanel)
     document.addEventListener('fullscreenchange',this.moveForFullscreen)
     document.addEventListener('pointerdown',this.closeMenu)
@@ -215,6 +227,7 @@ export default Vue.extend({
       if(saved.geometry){const g=saved.geometry;if([g.x,g.y,g.width,g.height].every(Number.isFinite)){this.x=g.x;this.y=g.y;this.width=g.width;this.height=g.height}}
       const s=saved.settings
       if(s){const f=this.form;f.start=s.start??0;f.end=s.end??f.end;f.clean=s.clean!==false;if([1,2,4].includes(s.rate))f.rate=s.rate;if(s.sensitivity in sensitivities)f.sensitivity=s.sensitivity;f.withAudio=!!s.withAudio;if(typeof s.autoApply==='boolean')f.autoApply=s.autoApply;if(Number.isFinite(s.offset))f.offset=Math.max(-1000,Math.min(1000,s.offset));if(Number.isInteger(s.numerator)&&s.numerator>=1&&s.numerator<=32)f.numerator=s.numerator;if([2,4,8,16].includes(s.denominator))f.denominator=s.denominator}
+      this.syncMeter()
       this.clampPanel()
     }}catch(error){this.say(String((error as Error).message||error),'warn')}
     if(this.dead)return
@@ -247,19 +260,21 @@ export default Vue.extend({
         this.say(`已把 ${r.bars.length} 个小节写入节拍器：${segments.length>1?`${segments.length} 个速度段，`:''}起始 ${segments[0].bpm.toFixed(1)} BPM（${this.form.numerator}/${this.form.denominator}）。`,'ok')
       }catch(e){this.fail(e)}
     },
+    /** One time signature everywhere: alignment and audio analysis use the metronome's first segment. */
+    syncMeter(){const s=this.barConfig?.segments[0];if(s&&(this.form.numerator!==s.numerator||this.form.denominator!==s.denominator)){this.form.numerator=s.numerator;this.form.denominator=s.denominator}},
     nudgeOffset(ms:number){this.form.offset=Math.max(-1000,Math.min(1000,this.form.offset+ms))},
     say(text:string,kind:'info'|'ok'|'warn'='info'){this.status=text;this.statusKind=kind},
     fail(e:unknown){this.say(e instanceof Error?e.message:String(e),'warn')},
     toggleTab(id:Tab){this.tab=this.tab===id?'':id;if(!this.tab)this.expanded=false;if(this.tab==='capture'){if(!this.preview)this.refreshPreview();else this.checkCrop()}},
-    closeMenu(e:Event){if(this.menuOpen&&!(e.target as Element).closest?.('.sp-menu'))this.menuOpen=false},
+    closeMenu(e:Event){if((this.menuOpen||this.rowMenu)&&!(e.target as Element).closest?.('.sp-menu')){this.menuOpen=false;this.rowMenu=''}},
     selectPractice(frames:ScoreFrame[]|null,id=''){this.practiceFrames=frames;this.practiceKey=id;this.active=-1;this.calibrating=false},
     async openChapters(){await this.open('chapters')},
     jumpChapter(chapter:Chapter){if(!this.busy)this.video.currentTime=chapter.time},
     rowChapters(frame:ScoreFrame,index:number){return this.chapters.filter(c=>c.time>=frame.time&&c.time<this.frameEnd(index)).map(c=>({...c,x:scorePosition(frame,this.frameEnd(index),c.time)}))},
     initDuration(){if(this.form.end<=0&&Number.isFinite(this.video.duration))this.form.end=this.videoDuration()},
     async open(tab?:Tab){this.visible=true;if(tab)this.tab=tab;if(this.tab==='capture'){if(!this.preview)this.refreshPreview();else this.checkCrop()}this.queueSave()},
-    closePanel(){this.visible=false;(this.$refs.editor as any)?.resetTemp?.();this.queueSave()},
-    previewConfig,tempMuteMetronome,deleteCurrentConfig,
+    closePanel(){this.visible=false;this.menuOpen=false;this.queueSave()},
+    previewConfig,deleteCurrentConfig,
     moveForFullscreen(){const target=document.fullscreenElement||document.body;if(this.$el.parentElement!==target)target.append(this.$el)},
     clampPanel(){this.width=Math.max(340,Math.min(this.width,window.innerWidth-16));this.height=Math.max(300,Math.min(this.height,window.innerHeight-16));this.x=Math.max(8,Math.min(this.x,window.innerWidth-this.width-8));this.y=Math.max(8,Math.min(this.y,window.innerHeight-this.height-8))},
     pointerTrack(event:PointerEvent,move:(e:PointerEvent)=>void,end:()=>void){
@@ -267,7 +282,7 @@ export default Vue.extend({
       const finish=()=>{window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',finish);window.removeEventListener('pointercancel',finish);this.dragCleanup=null;end()}
       window.addEventListener('pointermove',move);window.addEventListener('pointerup',finish);window.addEventListener('pointercancel',finish);this.dragCleanup=finish
     },
-    dragPanel(e:PointerEvent){if(this.locked||(e.target as Element).closest('button,input,label'))return;const x=this.x,y=this.y,sx=e.clientX,sy=e.clientY;this.pointerTrack(e,p=>{this.x=x+p.clientX-sx;this.y=y+p.clientY-sy;this.clampPanel()},()=>this.queueSave())},
+    dragPanel(e:PointerEvent){if(this.locked||(e.target as Element).closest('button,input,label,.sp-menu'))return;const x=this.x,y=this.y,sx=e.clientX,sy=e.clientY;this.pointerTrack(e,p=>{this.x=x+p.clientX-sx;this.y=y+p.clientY-sy;this.clampPanel()},()=>this.queueSave())},
     resizePanel(e:PointerEvent){const w=this.width,h=this.height,sx=e.clientX,sy=e.clientY;this.pointerTrack(e,p=>{this.width=w+p.clientX-sx;this.height=h+p.clientY-sy;this.clampPanel()},()=>this.queueSave())},
     nowTime(){return Number(this.video.currentTime.toFixed(2))},
     videoDuration(){return Number.isFinite(this.video.duration)?Number(this.video.duration.toFixed(2)):0},
@@ -378,7 +393,10 @@ export default Vue.extend({
         if(range&&!added.length&&!result.error){this.frames=original;message='这一段没有检测到换行，已保留原谱行。可把换行灵敏度调高后再试。';kind='warn'}
         else{this.frames=mergeScanned(original,added,start,stop);this.realign()}
         this.active=-1
-        if(audio&&this.analysis&&f.autoApply&&this.analysis.confidence>=.65&&this.analysis.bars.length>=3){this.applyAnalysis();message+=' 已自动应用节拍器。'}
+        // Fewest steps: a fresh video gets its metronome straight from the score; an existing setup is never overwritten silently.
+        const grid=this.barAlign
+        if(audio&&this.analysis&&this.analysis.confidence>=.65&&this.analysis.bars.length>=3){this.applyAnalysis();message+=' 已自动应用到节拍器。'}
+        else if(!this.barConfig&&!range&&grid&&grid.aligned&&grid.bars.length>=4){try{applyBarGrid(barGridSegments(grid.bars,f.numerator,f.denominator));message+=` 已按谱面小节线设好节拍器（${f.numerator}/${f.denominator}，拍号不对可在「节拍」里改后点「应用到节拍器」）。`}catch{}}
         if(!added.length&&!result.error&&!range){message+=seed?' 画面与已有谱行相同，没有新增。':' 没有发现谱面——请检查框选区域，或把换行灵敏度调高。';kind='warn'}
         this.say(message,kind)
         if(added.length&&!range){this.tab='bars';this.expanded=false}
