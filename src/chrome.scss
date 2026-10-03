@@ -120,7 +120,7 @@
 .barline-chrome-toolbar button:hover, .barline-chrome-toolbar button:focus-visible { color: #00aeec; opacity: 1; }
 .barline-chrome-toolbar .be-icon, .barline-chrome-toolbar svg { display: block; width: 22px; height: 22px; fill: currentColor; }
 .barline-chrome-toolbar svg[fill='none'] { fill: none; }
-.barline-chrome-toolbar button[data-name=barLineMarkStart], .barline-chrome-toolbar button[data-name=barLineMarkNext] { width: auto; min-width: 0; padding: 0 5px; }
+.barline-chrome-toolbar button[data-name=barLineMarkStart], .barline-chrome-toolbar button[data-name=barLineMarkNext], .barline-chrome-toolbar button[data-name=barLineDownbeat] { width: auto; min-width: 0; padding: 0 5px; }
 .barline-chrome-toolbar button[data-name=barLinePanel] { width: 30px; min-width: 30px; }
 .barline-chrome-toolbar .barline-button-label { display: inline-flex; align-items: center; height: 20px; padding: 0 2px; border-radius: 4px; }
 .barline-chrome-volume { display: none; position: absolute; top: auto; bottom: 100%; left: 50%; transform: translateX(-50%); z-index: 10; }

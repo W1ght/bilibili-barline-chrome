@@ -34,6 +34,7 @@ import {
   barStartTime,
   beatNumberAt,
   deleteConfig,
+  firstBeatForDownbeatAt,
   initStore,
   loadConfig,
   locateBar,
@@ -350,6 +351,20 @@ export function markNextBar() {
     markerNotice(`${fit.bpm.toFixed(2)} BPM（${segment.numerator}/${segment.denominator}）${error}。节拍器已开启。`)
   } catch (error) { markerNotice((error as Error).message) }
 }
+/** 「重拍对齐此处」：保持 BPM 与拍号，平移小节网格，让当前播放位置成为某小节的第一拍。 */
+export function alignDownbeatHere() {
+  if (!currentVideo || !currentKey) { markerNotice('视频尚未就绪，请稍后重试。'); return }
+  const draft = structuredClone(currentConfig || DEFAULT_CONFIG)
+  const firstBeatTime = firstBeatForDownbeatAt(draft, currentVideo.currentTime)
+  draft.segments[0].firstBeatTime = firstBeatTime
+  if (!currentConfig) {
+    draft.metronomeMuted = false
+    if (draft.metronomeVolume <= 0) draft.metronomeVolume = 0.1
+  }
+  resetLoop()
+  applyDraft(draft, 'markers')
+  markerNotice(`重拍已对齐到 ${formatTime(currentVideo.currentTime)}（第一拍 ${formatTime(firstBeatTime)}）。`)
+}
 const applyVolume = (volume: number) => {
   if (currentConfig) {
     currentConfig.metronomeVolume = volume
@@ -594,6 +609,7 @@ const shouldIgnoreKey = () => {
 const altShortcuts: Record<string, () => void> = {
   Digit1: () => markBarStart(),
   Digit2: () => markNextBar(),
+  Digit3: () => alignDownbeatHere(),
   KeyL: () => toggleLoop(),
   KeyM: () => toggleMute(),
 }

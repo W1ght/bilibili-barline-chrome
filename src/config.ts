@@ -257,6 +257,21 @@ export const barStartTime = (cfg: BarConfig, bar: number): number | null => {
   return null
 }
 
+/**
+ * 「重拍对齐此处」：整体平移小节网格（BPM、拍号、变速段不变），让某个小节的第一拍落在 t。
+ * 取平移量最小的方向，返回新的第一拍时间；t 在第一拍之前时第一小节直接从 t 开始。
+ */
+export const firstBeatForDownbeatAt = (cfg: BarConfig, t: number): number => {
+  const first = Math.max(0, cfg.segments[0]?.firstBeatTime ?? 0)
+  const loc = locateBar(cfg, t)
+  if (!loc) return Math.max(0, t)
+  const info = buildTimeline(cfg).filter(s => s.startTime <= loc.startTime + 1e-9).pop()
+  const barDuration = info?.barDuration ?? 0
+  const offset = t - loc.startTime
+  const shift = barDuration > 0 && offset > barDuration / 2 && first + offset - barDuration >= 0 ? offset - barDuration : offset
+  return Math.max(0, first + shift)
+}
+
 /** 时间 t 所在的拍号段；t 在时间线之前时返回第一段。 */
 export const segmentAt = (cfg: BarConfig, t: number): TimeSignatureSegment | null => {
   const infos = buildTimeline(cfg)

@@ -14,10 +14,11 @@
       </span>
       <span :class="['bl-tag', sourceTag.kind]">{{ sourceTag.text }}</span>
       <span class="sp-push"></span>
-      <span v-if="hasConfig" class="ble-first" title="第一小节第一拍的位置；节拍器重拍不对时用 ‹ › 挪一拍">
+      <span v-if="hasConfig" class="ble-first" title="第一小节第一拍的位置；节拍器重拍不对时用 ‹ › 挪一拍，或在重拍处点「此处为重拍」">
         第一拍 <b>{{ formatTime(segments[0].firstBeatTime ?? 0) }}</b>
         <button class="ghost small" aria-label="提前一拍" @click="nudgeFirstBeat(-1)">‹</button>
         <button class="ghost small" aria-label="推后一拍" @click="nudgeFirstBeat(1)">›</button>
+        <button class="ghost small" title="保持 BPM 和拍号，平移小节网格，让当前播放位置成为重拍（Alt+3）" @click="alignDownbeatHere">此处为重拍</button>
       </span>
     </section>
 
@@ -119,6 +120,7 @@ import {
   NUMERATOR_MIN,
   TimeSignatureSegment,
   clamp,
+  firstBeatForDownbeatAt,
   formatTime,
   locateBar,
   normalizeConfig,
@@ -343,6 +345,11 @@ export default Vue.extend({
     nudgeFirstBeat(direction: number) {
       const beat = segmentBeatDuration(this.segments[0])
       this.segments[0].firstBeatTime = Math.max(0, (this.segments[0].firstBeatTime ?? 0) + direction * beat)
+    },
+    alignDownbeatHere() {
+      const time = (this.video as HTMLVideoElement).currentTime
+      if (!Number.isFinite(time)) return
+      this.segments[0].firstBeatTime = firstBeatForDownbeatAt(this.draft, time)
     },
     onStartBarInput(index: number, e: Event) {
       const value = Math.round(Number((e.target as HTMLInputElement).value))
