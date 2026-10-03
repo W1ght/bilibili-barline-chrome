@@ -43,28 +43,19 @@
     <div v-show="tab" class="sp-drawer" :class="{tall:tab && (!shownFrames.length || expanded)}">
       <div v-show="tab==='bars'" class="sp-bars">
         <BarLineEditor ref="editor" embedded :video="video" :initial="barConfig || defaultConfig" :has-config="!!barConfig" :revision="barRevision"
-          :on-preview="previewConfig" :on-delete="deleteCurrentConfig">
+          :on-preview="previewConfig" :on-delete="deleteCurrentConfig" :sources="tempoSources">
+          <template #source-notes>
+            <details v-if="scoreSourceReady && skippedRows.length" class="sp-skipped"><summary>谱面：{{ skippedRows.length }} 行未对齐，按时间均匀估算</summary><ul><li v-for="row in skippedRows" :key="row.index"><b>第 {{ row.index + 1 }} 行</b>{{ row.reason }}</li></ul></details>
+          </template>
           <template #auto>
-            <section v-if="barAlign && barAlign.bars.length >= 3" class="ble-card sp-auto">
-              <div class="ble-card-head">
-                <h3>从谱面对齐</h3>
-                <span class="bl-tag" :class="barAlign.aligned ? 'ok' : 'warn'">{{ barAlign.aligned }} / {{ barAlign.candidates }} 行</span>
-              </div>
-              <div class="bl-row">
-                <span v-if="alignBpm" class="sp-bpm"><b>{{ alignBpm.toFixed(1) }}</b> BPM · {{ form.numerator }}/{{ form.denominator }} · {{ barAlign.bars.length - 1 }} 小节</span>
-                <span class="sp-push"></span>
-                <button class="primary" @click="applyBarGridToMetronome" :disabled="busy" title="把谱面小节线推算出的小节网格写入节拍器（变速处自动分段）">应用到节拍器</button>
-              </div>
-              <details v-if="skippedRows.length" class="sp-skipped"><summary>{{ skippedRows.length }} 行未对齐，按时间均匀估算</summary><ul><li v-for="row in skippedRows" :key="row.index"><b>第 {{ row.index + 1 }} 行</b>{{ row.reason }}</li></ul></details>
-            </section>
-            <button v-else-if="!frames.length && !barConfig" class="sp-cta" @click="toggleTab('capture')">
+            <button v-if="!scoreSourceReady && !frames.length && !barConfig" class="sp-cta" @click="toggleTab('capture')">
               <b>有谱面的视频？先抄谱</b><span>插件按谱面上的小节线自动算出 BPM 和节拍，不用手动打点。</span>
             </button>
           </template>
           <template #more>
             <section v-if="analysis" class="ble-sub sp-audio">
               <h4>音频分析</h4>
-              <div class="bl-row"><span class="sp-bpm"><b>{{ analysis.bpm.toFixed(1) }}</b> BPM</span><em :class="['bl-tag',confidenceClass]">{{ confidenceLabel }}可信度</em><span class="bl-muted">{{ analysis.variable ? '可能存在变速' : '' }}</span><span class="sp-push"></span><button class="small ghost" @click="exportTimeline" :disabled="busy">导出时间轴</button><button class="small" @click="applyAnalysis" :disabled="busy || !!practiceFrames">应用</button></div>
+              <div class="bl-row"><span class="sp-bpm"><b>{{ analysis.bpm.toFixed(1) }}</b> BPM</span><em :class="['bl-tag',confidenceClass]">{{ confidenceLabel }}可信度</em><span class="bl-muted">{{ analysis.variable ? '可能存在变速' : '' }}</span><span class="sp-push"></span><button class="small ghost" @click="exportTimeline" :disabled="busy">导出时间轴</button></div>
               <div class="bl-row"><span class="bl-muted">候选</span><button v-for="candidate in analysis.candidates.slice(0,3)" :key="candidate.bpm" class="small" :class="{active:candidate.bpm===analysis.bpm}" @click="chooseTempo(candidate.bpm)" :disabled="busy">{{ candidate.bpm.toFixed(1) }}</button></div>
             </section>
           </template>
@@ -74,7 +65,8 @@
         @crop-start="startCrop" @crop-preset="setCrop" @refresh="refreshPreview()" @set-range="setRange" @now="setNow" @range="setQuickRange" @start="scan()" @import="importImages" />
       <div v-show="tab==='practice'" class="sp-practice-tab">
         <ScoreChapters :chapters="chapters" :video="video" :busy="busy" :current-id="currentChapter && currentChapter.id" :clock="clock"
-          @change="chapters=$event;queueSave()" @jump="jumpChapter" @status="say" />
+          :loop-ids="loopActive ? loopIds : []" :loop-label="loopActive ? loopLabel : ''"
+          @change="chapters=$event;queueSave()" @jump="jumpChapter" @status="say" @loop="loopChapters" @stop-loop="stopLoop()" />
         <PracticePanel :video="video" :frames="framesForPractice" :chapters="chapters" :key-id="keyId" :busy="busy" @status="say" @select="selectPractice" @open="tab='practice'" />
       </div>
       <BarLineManager v-if="tab==='library'" embedded :current-key="barKey" />
@@ -83,7 +75,8 @@
     <p v-if="status" :class="['sp-status',statusKind]" role="status"><span>{{ status }}</span><button class="sp-icon small" @click="status=''" aria-label="关闭提示">×</button></p>
 
     <div v-if="chapters.length" class="sp-chapter-strip" aria-label="段落导航">
-      <button v-for="chapter in chapters" :key="chapter.id" class="bl-chip" :style="{'--chip':chapter.color}" :class="{active:currentChapter && currentChapter.id===chapter.id}" @click="jumpChapter(chapter)" :disabled="busy" :title="clock(chapter.time)">{{ chapter.name }}</button>
+      <button v-for="chapter in chapters" :key="chapter.id" class="bl-chip" :style="{'--chip':chapter.color}" :class="{active:currentChapter && currentChapter.id===chapter.id,looping:loopActive && loopIds.includes(chapter.id)}" @click="jumpChapter(chapter)" @dblclick="loopChapters([chapter.id])" :disabled="busy" :title="clock(chapter.time)+' · 双击循环这一段'">{{ chapter.name }}</button>
+      <button v-if="loopActive" class="small ghost sp-loop-stop" @click="stopLoop()" :title="'循环中：'+loopLabel">⟳ 停止循环</button>
     </div>
 
     <div v-if="shownFrames.length || calibrating" class="sp-now">
@@ -95,12 +88,14 @@
     </div>
 
     <div class="score-pages" ref="pages">
-      <article v-for="(frame,index) in shownFrames" :key="frame.id" :class="['score-frame', {active:index===active}]">
+      <article v-for="(frame,index) in shownFrames" :key="frame.id" :class="['score-frame', {active:index===active,looping:loopActive && loopIds.includes(frame.id)}]">
         <div class="score-row-tools">
-          <b class="sp-row-no">{{ index + 1 }}</b>
+          <button class="sp-row-no" @click="jumpRow(frame)" :disabled="busy" :title="`跳到第 ${index+1} 行开头（${clock(frame.time)}）`">{{ index + 1 }}</button>
           <input :aria-label="`第${index+1}行起始时间`" :value="clock(frame.time)" @change="changeTime(frame,$event)" :disabled="busy || !!practiceFrames" :title="'起始 '+frame.time.toFixed(3)+' 秒，可输入 m:ss 或秒数'" />
           <span class="sp-row-range">– {{ clock(frameEnd(index)) }}</span>
           <span :class="['bl-tag',modeClass(frame)]">{{ rowMode(frame) }}</span>
+          <button class="ghost small sp-row-loop" :class="{on:loopActive && loopIds.includes(frame.id)}" @click="loopRows(index,$event)" :disabled="busy"
+            :title="loopActive && loopIds.includes(frame.id) ? '循环中（Ctrl+点击移出循环）' : '循环这一行 · Shift+点击：从上次点的行连到这一行 · Ctrl+点击：加入当前循环'">⟳</button>
           <span v-if="!practiceFrames" class="sp-row-actions">
             <button class="ghost small" @click="rescanRow(index)" :disabled="busy" title="只重新抄写这一行的时间段">重抄</button>
             <span class="sp-menu down" :class="{open:rowMenu===frame.id}">
@@ -113,7 +108,9 @@
             </span>
           </span>
         </div>
-        <div class="score-image-wrap" :class="{calibrating}" @click="clickScore(frame,index,$event)">
+        <div class="score-image-wrap" :class="{calibrating}" @click="clickScore(frame,index,$event)" @pointerdown="startRowSelect(frame,index,$event)" @dblclick="loopMeasure(frame,index,$event)"
+          :title="calibrating?'':'点击跳到这里 · 双击循环这一小节 · 横向拖选循环一段'">
+          <span v-if="rowSel && rowSel.id===frame.id" class="score-loop-range" :style="{left:(rowSel.x0*100)+'%',width:((rowSel.x1-rowSel.x0)*100)+'%'}"></span>
           <span v-for="chapter in rowChapters(frame,index)" :key="chapter.id" class="score-chapter-pin" :style="{left:(chapter.x*100)+'%','--chip':chapter.color}" :title="chapter.name+' · '+clock(chapter.time)"><b>{{ chapter.name }}</b></span>
           <img :src="frame.image" :alt="`谱面第 ${index+1} 行`" draggable="false" loading="lazy" />
           <span v-for="anchor in frame.anchors.filter(a=>a.manual)" :key="anchor.time" class="score-anchor" :style="{left:(anchor.x*100)+'%'}" :title="clock(anchor.time)"></span>
@@ -134,7 +131,8 @@
         <button class="sp-toggle" :class="{on:calibrating}" :aria-pressed="calibrating" @click="calibrating=!calibrating" title="定位线不准时：暂停在某个音符上，点击谱图中对应位置">校准定位线</button>
       </template>
       <span class="sp-push"></span>
-      <span class="sp-count">{{ frames.length }} 行</span>
+      <button v-if="loopActive" class="small ghost sp-loop-stop" @click="stopLoop()" :title="'循环中：'+loopLabel">⟳ {{ loopLabel }} · 停止</button>
+      <span v-else class="sp-count">{{ frames.length }} 行</span>
     </footer>
     <div v-if="!locked" class="score-resize" @pointerdown="resizePanel" title="拖动调整谱窗大小"></div>
   </section>
@@ -142,19 +140,21 @@
 
 <script lang="ts">
 import Vue from 'vue'
-import {ScoreFrame,ScoreAnchor,CropRegion,defaultCrop,validCrop,activeScore,scorePosition,timeAtPosition,addAnchor} from './score-model'
-import {captureScore,ScoreShot,FrameSampler,playScan,seekFrame,scoreRequest,downloadScore} from './score-capture'
+import {ScoreFrame,ScoreAnchor,CropRegion,defaultCrop,validCrop,activeScore,scorePosition,timeAtPosition,addAnchor,measureAt,snapToBarLine} from './score-model'
+import {captureScore,captureKeyframe,ScoreShot,FrameSampler,playScan,seekFrame,scoreRequest,downloadScore} from './score-capture'
+import {ScrollTracker} from './score-scroll'
+import {FINGERPRINT_W,FINGERPRINT_H,LEFT_SHARE,LEFT_TOP,LEFT_W,LEFT_H,RowFingerprint,rowFingerprint,firstOccurrences} from './score-dedupe'
 import {ScoreSegmenter,ScanRow,InkMask,sensitivities,defaultSegmentOptions,fitCursorAnchors,mergeScanned} from './score-segment'
 import {AnalysisResult,analyzeTempo,visualBarTimes,alignEstimatedRows} from './score-analysis'
 import {AudioOnsets} from './score-audio'
-import {applyAnalyzedTempo,applyBarGrid,suspendForScoreAnalysis,onBarState,previewConfig,deleteCurrentConfig} from './index'
+import {applyAnalyzedTempo,applyBarGrid,suspendForScoreAnalysis,onBarState,previewConfig,deleteCurrentConfig,loopSpans,stopLoop,onLoopState} from './index'
 import {BarAlignResult,autoAlignBars,applyBarAlignment,barGridSegments} from './bar-align'
-import {parseTime,BarConfig,DEFAULT_CONFIG} from './config'
-import {Chapter,validateChapters,chapterAt} from './score-chapters'
+import {parseTime,formatBpm,locateBar,barStartTime,BarConfig,DEFAULT_CONFIG} from './config'
+import {Chapter,validateChapters,chapterAt,chapterSpans} from './score-chapters'
 import PracticePanel from './PracticePanel.vue'
 import ScoreCaptureForm from './ScoreCaptureForm.vue'
 import ScoreChapters from './ScoreChapters.vue'
-import BarLineEditor from './BarLineEditor.vue'
+import BarLineEditor,{TempoSource} from './BarLineEditor.vue'
 import BarLineManager from './BarLineManager.vue'
 
 const crops:Record<string,CropRegion>={top:{left:0,top:0,right:1,bottom:.4},bottom:{left:0,top:.6,right:1,bottom:1},full:{left:0,top:0,right:1,bottom:1}}
@@ -173,7 +173,7 @@ export default Vue.extend({
     barAlign:null as BarAlignResult|null,expanded:false,
     barConfig:null as BarConfig|null,barKey:'',barRevision:0,defaultConfig:DEFAULT_CONFIG,offBar:null as (()=>void)|null,
     cropCheck:null as {ok:boolean;text:string}|null,analysis:null as AnalysisResult|null,
-    chapters:[] as Chapter[],practiceFrames:null as ScoreFrame[]|null,practiceKey:'',
+    chapters:[] as Chapter[],loopIds:[] as string[],loopAnchor:-1,rowSel:null as {id:string;x0:number;x1:number}|null,suppressClick:false,loopLabel:'',loopActive:false,offLoop:null as (()=>void)|null,practiceFrames:null as ScoreFrame[]|null,practiceKey:'',
     frames:[] as ScoreFrame[],crop:{...defaultCrop} as CropRegion,
     time:0,active:-1,position:0,x:Math.max(10,window.innerWidth-590),y:90,width:570,height:Math.min(720,window.innerHeight-110),
     controller:null as AbortController|null,raf:0,saveTimer:0,saveChain:Promise.resolve() as Promise<unknown>,dead:false,dragCleanup:null as (()=>void)|null,
@@ -191,7 +191,20 @@ export default Vue.extend({
       const c=this.barConfig;if(!c)return '未设置节拍'
       const s=c.segments[0],source=c.tempoSource==='manual-bars'?' · 已校准':c.tempoSource==='auto'?' · 自动':''
       return `${Number(s.bpm.toFixed(1))} BPM · ${s.numerator}/${s.denominator}${c.segments.length>1?` · ${c.segments.length} 段`:''}${source}`
-    },    alignBpm():number|null{const d=this.barAlign?.barDuration;return d&&this.barAlign!.aligned?60*this.form.numerator*4/this.form.denominator/d:null},
+    },
+    scoreSourceReady():boolean{return !!(this.barAlign&&this.barAlign.bars.length>=3&&this.alignBpm)},
+    /** Everything that can set the tempo goes through the editor's single「应用速度」card. */
+    tempoSources():TempoSource[]{
+      const list:TempoSource[]=[]
+      if(this.scoreSourceReady){const a=this.barAlign!,skipped=this.skippedRows.length
+        list.push({id:'score',label:'谱面小节线',bpm:this.alignBpm!,detail:`${a.aligned}/${a.candidates} 行对齐 · ${a.bars.length-1} 小节${skipped?` · ${skipped} 行估算`:''}`,warn:!a.aligned||skipped>0,
+          hint:`按谱面小节网格写入（${this.form.numerator}/${this.form.denominator}，变速处自动分段）。`,disabled:this.busy,apply:()=>this.applyBarGridToMetronome()})}
+      if(this.analysis){const a=this.analysis
+        list.push({id:'audio',label:'音频分析',bpm:a.bpm,detail:`${this.confidenceLabel}可信度${a.variable?' · 可能变速':''}`,warn:a.confidence<.4,
+          hint:a.bars.length<3?'首拍为音频估算，应用后用「此处为重拍」校准。':'替换小节轴并开启节拍器。',disabled:this.busy||!!this.practiceFrames,apply:()=>this.applyAnalysis()})}
+      return list
+    },
+    alignBpm():number|null{const d=this.barAlign?.barDuration;return d&&this.barAlign!.aligned?60*this.form.numerator*4/this.form.denominator/d:null},
     skippedRows():{index:number;reason:string}[]{return (this.barAlign?.rows||[]).filter(r=>r.reason) as {index:number;reason:string}[]},
     confidenceLabel():string{const c=this.analysis?.confidence??0;return c>=.65?'较高':c>=.4?'中等':'较低'},
     confidenceClass():string{const c=this.analysis?.confidence??0;return c>=.65?'ok':c>=.4?'':'warn'},
@@ -209,6 +222,7 @@ export default Vue.extend({
   },
   async mounted(){
     savedImages.set(this,new Map())
+    this.offLoop=onLoopState(s=>{this.loopActive=s.active;this.loopLabel=s.label;if(!s.active){this.loopIds=[];this.rowSel=null}})
     this.offBar=onBarState((state,source)=>{this.barConfig=state.config;this.barKey=state.key;this.syncMeter();if(source!=='editor')this.barRevision++})
     window.addEventListener('resize',this.clampPanel)
     document.addEventListener('fullscreenchange',this.moveForFullscreen)
@@ -236,7 +250,7 @@ export default Vue.extend({
     this.ready=true;this.tick();this.moveForFullscreen()
   },
   beforeDestroy(){
-    this.dead=true;this.offBar?.();this.controller?.abort();cancelAnimationFrame(this.raf);clearTimeout(this.saveTimer);this.dragCleanup?.()
+    this.dead=true;this.offBar?.();this.offLoop?.();this.controller?.abort();cancelAnimationFrame(this.raf);clearTimeout(this.saveTimer);this.dragCleanup?.()
     window.removeEventListener('resize',this.clampPanel);document.removeEventListener('fullscreenchange',this.moveForFullscreen);document.removeEventListener('pointerdown',this.closeMenu)
     this.video.removeEventListener('durationchange',this.initDuration)
     if(this.ready&&this.saveTimer)void this.persist().catch(()=>{})
@@ -270,6 +284,50 @@ export default Vue.extend({
     selectPractice(frames:ScoreFrame[]|null,id=''){this.practiceFrames=frames;this.practiceKey=id;this.active=-1;this.calibrating=false},
     async openChapters(){await this.open('chapters')},
     jumpChapter(chapter:Chapter){if(!this.busy)this.video.currentTime=chapter.time},
+    stopLoop,
+    /** Loop score rows: click one row; Shift+click extends from the last clicked row; Ctrl+click adds/removes a row. */
+    loopRows(index:number,e:MouseEvent){
+      if(this.busy)return
+      const rows=this.shownFrames,frame=rows[index]
+      // Plain click on the ⟳ of a row that is looping on its own: turn the loop off.
+      if(!e.shiftKey&&!e.ctrlKey&&!e.metaKey&&this.loopActive&&!this.rowSel&&this.loopIds.length===1&&this.loopIds[0]===frame.id){stopLoop();return}
+      let ids:string[]
+      if(e.shiftKey&&this.loopAnchor>=0&&this.loopAnchor<rows.length){
+        const lo=Math.min(this.loopAnchor,index),hi=Math.max(this.loopAnchor,index)
+        ids=rows.slice(lo,hi+1).map(r=>r.id)
+      }else if((e.ctrlKey||e.metaKey)&&this.loopActive){
+        const current=this.loopIds.filter(id=>rows.some(r=>r.id===id))
+        ids=current.includes(frame.id)?current.filter(id=>id!==frame.id):[...current,frame.id]
+        this.loopAnchor=index
+        if(!ids.length){stopLoop();return}
+      }else{ids=[frame.id];this.loopAnchor=index}
+      const picked=rows.map((r,i)=>({r,i})).filter(({r})=>ids.includes(r.id))
+      const spans=picked.map(({r,i})=>({start:r.time,end:this.frameEnd(i)}))
+      // Label: runs of consecutive rows, e.g. 第 3–5、8 行
+      const runs:string[]=[];let from=-1,prev=-2
+      for(const {i} of [...picked,{i:-9} as {i:number}]){if(i===prev+1){prev=i;continue}if(from>=0)runs.push(from===prev?`${from+1}`:`${from+1}–${prev+1}`);from=prev=i}
+      loopSpans(spans,`第 ${runs.join('、')} 行`)
+      this.loopIds=ids
+    },
+    /** Loop one or several chapters; boundaries snap to the nearest bar line when a tempo is set. */
+    loopChapters(ids:string[]){
+      if(this.busy||!ids.length)return
+      const cfg=this.barConfig
+      const snap=(t:number)=>{
+        if(!cfg)return t
+        const loc=locateBar(cfg,t);if(!loc)return t
+        const next=barStartTime(cfg,loc.bar+1),candidates=[loc.startTime,...(next!==null?[next]:[])]
+        const best=candidates.reduce((a,b)=>Math.abs(b-t)<Math.abs(a-t)?b:a)
+        const bar=(next??loc.startTime+1)-loc.startTime
+        return Math.abs(best-t)<=bar*.25?best:t
+      }
+      const spans=chapterSpans(this.chapters,ids,this.video.duration,snap)
+      if(!spans.length){this.say('所选段落太短或时间无效，无法循环。','warn');return}
+      const names=this.chapters.filter(c=>ids.includes(c.id)).map(c=>c.name)
+      // Starting a loop first resets the previous one (which clears loopIds), so record the ids afterwards.
+      loopSpans(spans,names.join(' + '))
+      this.loopIds=[...ids]
+    },
     rowChapters(frame:ScoreFrame,index:number){return this.chapters.filter(c=>c.time>=frame.time&&c.time<this.frameEnd(index)).map(c=>({...c,x:scorePosition(frame,this.frameEnd(index),c.time)}))},
     initDuration(){if(this.form.end<=0&&Number.isFinite(this.video.duration))this.form.end=this.videoDuration()},
     async open(tab?:Tab){this.visible=true;if(tab)this.tab=tab;if(this.tab==='capture'){if(!this.preview)this.refreshPreview();else this.checkCrop()}this.queueSave()},
@@ -354,8 +412,11 @@ export default Vue.extend({
       if(covering&&covering.time<start-.001&&start<(covering.end??original[cover+1]?.time??Infinity))try{seed=await sampler.maskOf(v,covering.image,covering.width,covering.height)}catch{}
       const segmenter=new ScoreSegmenter<ScoreShot>(()=>captureScore(v,crop,clean),{...defaultSegmentOptions,threshold:sensitivities[f.sensitivity as keyof typeof sensitivities]})
       if(seed)segmenter.seed(seed)
+      // Runs alongside: once the picture is seen scrolling, rows come from the cursor's path through the page instead.
+      const tracker=new ScrollTracker<ScoreShot>(()=>captureKeyframe(v,crop,clean))
+      let lastLive=-Infinity
       const ids=new WeakMap<object,string>()
-      const toFrame=(r:ScanRow<ScoreShot>,anchors:ScoreAnchor[]=[]):ScoreFrame=>{
+      const toFrame=(r:Pick<ScanRow<ScoreShot>,'time'|'end'|'shot'>,anchors:ScoreAnchor[]=[]):ScoreFrame=>{
         if(!ids.has(r))ids.set(r,crypto.randomUUID())
         return {id:ids.get(r)!,time:r.time,...(r.end!==undefined?{end:r.end}:{}),image:r.shot.image,width:r.shot.width,height:r.shot.height,barLines:r.shot.barLines,anchors}
       }
@@ -369,19 +430,23 @@ export default Vue.extend({
           onPlay:audio?()=>audio.connect(v):undefined,
           onTick:audio?t=>audio.sample(t):undefined,
           onFrame:t=>{
-            const s=sampler.sample(v),event=segmenter.push({time:t,mask:s.mask,cursor:s.cursor})
-            if(event==='row'||event==='grow'){
-              const merged=mergeScanned(original,segmenter.rows.map(r=>toFrame(r)),start,t)
+            const s=sampler.sample(v),wasScrolling=tracker.scrolling,scrollEvent=tracker.push({time:t,mask:s.mask,box:s.box})
+            const event=tracker.scrolling?null:segmenter.push({time:t,mask:s.mask,cursor:s.cursor})
+            const live=tracker.scrolling&&(scrollEvent==='system'||!wasScrolling||t-lastLive>=1)
+            if(event==='row'||event==='grow'||live){
+              if(live)lastLive=t
+              const merged=mergeScanned(original,(tracker.scrolling?tracker.rows():segmenter.rows).map(r=>toFrame(r)),start,t)
               if(merged.length>160||merged.reduce((n,r)=>n+r.image.length,0)>35000000)throw new Error('谱图已达 160 行或容量上限，已停止。请分段抄写，或把换行灵敏度调低。')
               this.frames=merged
             }
             this.progress=(t-start)/(end-start)
-            this.status=`抄谱中 ${Math.round(this.progress*100)}% · ${clock(t)} · 新增 ${segmenter.rows.length} 行`
+            this.status=`抄谱中 ${Math.round(this.progress*100)}% · ${clock(t)} · ${tracker.scrolling?`滚动谱，已识别 ${tracker.systemCount} 行谱`:`新增 ${segmenter.rows.length} 行`}`
           }})
         if(this.dead||this.video!==v)return
-        const stop=result.time,added=segmenter.finish().map(r=>toFrame(r,fitCursorAnchors(r.cursor)))
+        const scrolling=tracker.scrolling,stop=result.time
+        const added=(scrolling?tracker.rows():segmenter.finish()).map(r=>toFrame(r,fitCursorAnchors(r.cursor)))
         const aborted=result.error?.name==='AbortError'
-        let message=`${aborted?'已停止。':result.error?result.error.message+' ':''}已抄 ${clock(start)}–${clock(stop)}：新增 ${added.length} 行，其中 ${added.filter(r=>r.anchors.length>=2).length} 行识别到播放光标。`
+        let message=`${aborted?'已停止。':result.error?result.error.message+' ':''}已抄 ${clock(start)}–${clock(stop)}：${scrolling?`识别为滚动谱（滚动 ${tracker.scrolls} 次，${tracker.systemCount} 行谱），`:''}新增 ${added.length} 行，其中 ${added.filter(r=>r.anchors.length>=2).length} 行识别到播放光标。`
         let kind:'ok'|'warn'=result.error&&!aborted?'warn':'ok'
         if(audio){
           if(stop-start>=8)try{
@@ -415,11 +480,47 @@ export default Vue.extend({
       void this.scan({start,end:this.frameEnd(index)})
     },
     chooseTempo(bpm:number){if(!this.analysis)return;const a=this.analysis,c=a.candidates.find(c=>c.bpm===bpm);if(!c)return;const beats:number[]=[];for(let t=c.phase;t<a.end;t+=60/bpm)beats.push(t);this.analysis={...a,bpm,beats,bars:[]};for(const f of this.frames)if(f.anchors.some(a=>a.source==='audio-estimate'))f.anchors=[];alignEstimatedRows(this.frames,this.analysis);this.say('已选择候选速度；小节重拍需用起点／下一节校准。');this.queueSave()},
-    applyAnalysis(){if(!this.analysis)return;const a=this.analysis;try{applyAnalyzedTempo(a.bpm,a.bars[0]??a.beats[0]??a.start,a.numerator,a.denominator,a.bars);this.say(`已应用 ${a.bpm.toFixed(2)} BPM，替换小节轴并开启节拍器。${a.bars.length<3?'首拍为音频估算，请校准重拍。':''}`,'ok')}catch(e){this.fail(e)}},
+    applyAnalysis(){if(!this.analysis)return;const a=this.analysis;try{applyAnalyzedTempo(a.bpm,a.bars[0]??a.beats[0]??a.start,a.numerator,a.denominator,a.bars);this.say(`已应用 ${formatBpm(a.bpm)} BPM，替换小节轴并开启节拍器。${a.bars.length<3?'首拍为音频估算，请校准重拍。':''}`,'ok')}catch(e){this.fail(e)}},
     exportTimeline(){if(this.analysis)downloadScore(new Blob([JSON.stringify({version:1,key:this.keyId,analysis:this.analysis,chapters:this.chapters,rows:this.frames.map(({time,end,anchors,barLines})=>({time,end,anchors,barLines}))},null,2)],{type:'application/json'}),'bilibili-score-timeline.json')},
     async captureOne(){try{if(this.frames.length>=160)throw new Error('最多保存 160 行，请先删除重复谱面。');const t=this.video.currentTime;if(this.frames.some(f=>Math.abs(f.time-t)<.05))throw new Error('这个时间已有谱行，请先删除旧的再补截。');const result=captureScore(this.video,this.crop,this.form.clean);this.frames.push(this.makeFrame(t,result));this.frames.sort((a,b)=>a.time-b.time);this.realign();await this.persist();this.say('已补截当前画面并保存。','ok')}catch(e){this.fail(e)}},
     stopCapture(){this.controller?.abort()},
+    /** Horizontal drag on a row image selects a span inside the row (ends snap to bar lines) and loops it. */
+    startRowSelect(frame:ScoreFrame,index:number,e:PointerEvent){
+      if(this.busy||this.calibrating||e.button!==0)return
+      const el=e.currentTarget as HTMLElement,rect=el.getBoundingClientRect(),sx=e.clientX
+      const xAt=(p:PointerEvent)=>Math.max(0,Math.min(1,(p.clientX-rect.left)/rect.width))
+      const before=this.rowSel;let dragging=false
+      this.pointerTrack(e,p=>{
+        if(!dragging&&Math.abs(p.clientX-sx)<6)return
+        dragging=true
+        const a=xAt(e),b=xAt(p)
+        this.rowSel={id:frame.id,x0:Math.min(a,b),x1:Math.max(a,b)}
+      },()=>{
+        if(!dragging)return
+        // The click that follows this drag must not seek; reset in case it never arrives.
+        this.suppressClick=true;setTimeout(()=>{this.suppressClick=false},0)
+        const sel=this.rowSel!,x0=snapToBarLine(frame.barLines,sel.x0),x1=snapToBarLine(frame.barLines,sel.x1)
+        if(!this.loopRowRange(frame,index,x0,x1,`第 ${index+1} 行片段`))this.rowSel=before
+      })
+    },
+    loopMeasure(frame:ScoreFrame,index:number,e:MouseEvent){
+      if(this.busy||this.calibrating)return
+      const rect=(e.currentTarget as HTMLElement).getBoundingClientRect(),x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))
+      if(!frame.barLines?.length){this.say('这一行没有识别到小节线，请在谱图上横向拖选要循环的范围。','warn');return}
+      const m=measureAt(frame.barLines,x),sel=this.rowSel
+      // Double-clicking the measure that is already looping turns the loop off.
+      if(this.loopActive&&sel&&sel.id===frame.id&&Math.abs(sel.x0-m.x0)<.005&&Math.abs(sel.x1-m.x1)<.005){stopLoop();return}
+      this.loopRowRange(frame,index,m.x0,m.x1,`第 ${index+1} 行第 ${m.index} 小节`)
+    },
+    loopRowRange(frame:ScoreFrame,index:number,x0:number,x1:number,label:string){
+      const end=this.frameEnd(index),start=timeAtPosition(frame,end,x0),stop=timeAtPosition(frame,end,x1)
+      if(!(stop-start>=.2)){this.say('选的范围太短（不足 0.2 秒），请拖宽一点。','warn');return false}
+      loopSpans([{start,end:stop}],`${label}（${clock(start)}–${clock(stop)}）`)
+      this.loopIds=[frame.id];this.rowSel={id:frame.id,x0,x1}
+      return true
+    },
     clickScore(frame:ScoreFrame,index:number,e:MouseEvent){
+      if(this.suppressClick){this.suppressClick=false;return}
       if(this.busy)return
       if(this.practiceFrames&&this.calibrating)return
       const rect=(e.currentTarget as HTMLElement).getBoundingClientRect(),x=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width))
@@ -432,17 +533,36 @@ export default Vue.extend({
     changeTime(frame:ScoreFrame,e:Event){const n=parseTime((e.target as HTMLInputElement).value);if(!Number.isFinite(n)||n<0||n>=this.video.duration||this.frames.some(f=>f!==frame&&Math.abs(f.time-n)<.02)){this.say('时间无效或与另一行重复','warn');(e.target as HTMLInputElement).value=clock(frame.time);return}
       // Cursor/manual anchors are absolute video times, so those still inside the row stay valid.
       frame.time=n;if(frame.end!==undefined&&frame.end<=n)this.$delete(frame,'end');frame.anchors=frame.anchors.filter(a=>a.time>=n&&(frame.end===undefined||a.time<=frame.end));if(frame.anchors.length<2)frame.anchors=[];this.frames.sort((a,b)=>a.time-b.time);this.active=-1;this.realign();this.queueSave()},
+    jumpRow(frame:ScoreFrame){if(!this.busy)this.video.currentTime=Math.max(0,frame.time+this.form.offset/1000)},
     setStartNow(frame:ScoreFrame){this.changeTime(frame,{target:{value:String(this.video.currentTime)}} as any)},
     resetAnchors(frame:ScoreFrame){frame.anchors=[];this.realign();this.queueSave()},
     removeFrame(frame:ScoreFrame){this.frames=this.frames.filter(f=>f!==frame);this.active=-1;this.realign();this.queueSave()},
+    /** Mark rows that repeat an earlier row (repeat signs, D.S.); printing and PNG export show each row once. */
+    async markRepeats(frames:ScoreFrame[]){
+      const canvas=document.createElement('canvas'),ctx=canvas.getContext('2d',{willReadFrequently:true})!,prints:(RowFingerprint|null)[]=[]
+      const draw=(img:HTMLImageElement,sw:number,sh:number,w:number,h:number)=>{canvas.width=w;canvas.height=h;ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h);ctx.drawImage(img,0,0,sw,sh,0,0,w,h);return ctx.getImageData(0,0,w,h).data}
+      for(const f of frames){
+        try{
+          const img=new Image();img.src=f.image;await img.decode()
+          const thumb=draw(img,img.width,img.height,FINGERPRINT_W,FINGERPRINT_H)
+          const corner=draw(img,Math.max(1,Math.round(img.width*LEFT_SHARE)),Math.max(1,Math.round(img.height*LEFT_TOP)),LEFT_W,LEFT_H)
+          prints.push(rowFingerprint(thumb,corner,img.width/img.height))
+        }catch{prints.push(null)}
+      }
+      const first=firstOccurrences(frames.map(f=>f.image),prints)
+      frames.forEach((f,i)=>{if(first[i]!==i)f.repeatOf=frames[first[i]].id;else delete f.repeatOf})
+      return frames.filter((_,i)=>first[i]===i)
+    },
     async exportPng(){try{
-      const images=await Promise.all(this.shownFrames.map(f=>new Promise<HTMLImageElement>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('谱图读取失败'));img.src=f.image})))
+      const total=this.shownFrames.length,unique=await this.markRepeats(this.shownFrames)
+      if(unique.length<total)this.say(`已合并 ${total-unique.length} 行重复（反复演奏），长图里每行只出现一次。`,'ok')
+      const images=await Promise.all(unique.map(f=>new Promise<HTMLImageElement>((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('谱图读取失败'));img.src=f.image})))
       const width=Math.max(...images.map(i=>i.width)),heights=images.map(i=>Math.round(i.height*width/i.width)),height=heights.reduce((a,b)=>a+b+12,0)
       if(height>30000||width*height>50000000)throw new Error('长图尺寸过大，请使用 PDF / 打印分成多页。')
       const c=document.createElement('canvas');c.width=width;c.height=height;const ctx=c.getContext('2d')!;ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);let y=0;images.forEach((img,i)=>{ctx.drawImage(img,0,y,width,heights[i]);y+=heights[i]+12})
       const blob=await new Promise<Blob|null>(resolve=>c.toBlob(resolve));if(!blob)throw new Error('长图生成失败');downloadScore(blob,'bilibili-score.png')
     }catch(e){this.fail(e)}},
-    async printScore(){try{if(this.practiceKey){await scoreRequest('print','practice:'+this.practiceKey);return}await this.persist();await scoreRequest('print',this.keyId)}catch(e){this.fail(e)}},
+    async printScore(){try{if(this.practiceKey){await scoreRequest('print','practice:'+this.practiceKey);return}await this.markRepeats(this.frames);await this.persist();await scoreRequest('print',this.keyId)}catch(e){this.fail(e)}},
     exportBackup(){downloadScore(new Blob([JSON.stringify({version:2,frames:this.frames,crop:this.crop,analysis:this.analysis,chapters:this.chapters})],{type:'application/json'}),'bilibili-score-backup.json')},
     validateFrames(value:any):ScoreFrame[]{
       if(!Array.isArray(value)||value.length>160)throw new Error('谱面备份格式无效')

@@ -62,6 +62,8 @@
 .score-row-tools { display: flex; align-items: center; gap: 6px; min-height: 34px; padding: 4px 6px 4px 8px; font-size: 12px; color: var(--bl-text-2); font-variant-numeric: tabular-nums; }
 .sp-row-no { display: grid; place-items: center; min-width: 22px; height: 20px; padding: 0 4px; border-radius: 6px; font-size: 11px; color: var(--bl-text-2); background: var(--bl-surface-2); }
 .score-frame.active .sp-row-no { color: #fff; background: var(--bl-accent); }
+.barline-ui button.sp-row-no { width: auto; height: 20px; min-width: 22px; padding: 0 4px; border: 0; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+.barline-ui button.sp-row-no:hover:not(:disabled) { color: #fff; background: var(--bl-accent); }
 .barline-ui .score-row-tools input:not([type]) { width: 64px; height: 24px; padding: 0 6px; font-size: 12px; border-color: transparent; background: transparent; }
 .barline-ui .score-row-tools input:not([type]):hover:not(:disabled) { border-color: var(--bl-border-strong); }
 .barline-ui .score-row-tools input:not([type]):focus { background: var(--bl-bg); }
@@ -97,6 +99,15 @@
 .sp-chapter-list li { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: var(--bl-radius-sm); }
 .sp-chapter-list li.current { background: var(--bl-accent-soft); }
 .barline-ui .sp-chapter-list .sp-chapter-name { flex: 1; min-width: 60px; }
+.sp-chapter-list li.looping { box-shadow: inset 3px 0 0 #ff8a3d; }
+.barline-ui .sp-chapter-list .sp-chapter-pick { width: 16px; height: 16px; margin: 0; accent-color: var(--bl-accent); flex-shrink: 0; }
+.sp-chapter-loop { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 10px 0 0; font-size: 12px; }
+.barline-ui .bl-chip.looping { box-shadow: 0 0 0 2px #ff8a3d; }
+.barline-ui .sp-loop-stop { flex-shrink: 0; height: 26px; max-width: 60%; overflow: hidden; text-overflow: ellipsis; color: #ff8a3d; white-space: nowrap; }
+.barline-ui .sp-row-loop { width: 26px; padding: 0; font-size: 15px; }
+.barline-ui .sp-row-loop.on { color: #fff; background: #ff8a3d; }
+.score-frame.looping { box-shadow: 0 0 0 2px #ff8a3d; }
+.score-loop-range { position: absolute; top: 0; bottom: 0; z-index: 1; pointer-events: none; background: rgba(255, 138, 61, .22); border-left: 2px solid #ff8a3d; border-right: 2px solid #ff8a3d; }
 .barline-ui .sp-chapter-list .sp-chapter-time { width: 72px; }
 .barline-ui .sp-chapters .bl-input-group input:not([type]) { width: 150px; }
 

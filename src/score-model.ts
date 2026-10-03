@@ -1,5 +1,7 @@
 export interface ScoreAnchor { time: number; x: number; manual?: boolean; source?: 'audio-estimate'|'bar-estimate' }
-export interface ScoreFrame { id: string; time: number; image: string; width: number; height: number; anchors: ScoreAnchor[]; barLines?:number[]; end?:number }
+export interface ScoreFrame { id: string; time: number; image: string; width: number; height: number; anchors: ScoreAnchor[]; barLines?:number[]; end?:number
+  /** 与更早的某一行内容相同（反复演奏）：打印 / 导出长图时合并到那一行。 */
+  repeatOf?:string }
 export interface CropRegion { left: number; top: number; right: number; bottom: number }
 export const defaultCrop: CropRegion = {left:0, top:0, right:1, bottom:.43}
 export function validCrop(c: CropRegion) {
@@ -28,6 +30,19 @@ export function timeAtPosition(frame:ScoreFrame,end:number,x:number) {
     return anchors[anchors.length-1].time
   }
   return frame.time + Math.max(0,Math.min(1,x))*Math.max(0,end-frame.time)
+}
+/** 谱行里 x 所在的小节（相邻两条小节线之间）；返回小节的左右边界和在本行的序号（从 1 开始）。 */
+export function measureAt(barLines:number[]|undefined,x:number){
+  const lines=[...(barLines??[])].filter(v=>v>0&&v<1).sort((a,b)=>a-b)
+  let x0=0,x1=1,index=1
+  for(const v of lines){if(v<=x){x0=v;index++}else{x1=v;break}}
+  return {x0,x1,index}
+}
+/** 拖选的端点靠近小节线（2.5% 宽度内）时吸附上去。 */
+export function snapToBarLine(barLines:number[]|undefined,x:number,reach=.025){
+  let best=x,dist=reach
+  for(const v of barLines??[])if(Math.abs(v-x)<dist){best=v;dist=Math.abs(v-x)}
+  return best
 }
 export function addAnchor(frame:ScoreFrame,anchor:ScoreAnchor) {
   if(!Number.isFinite(anchor.time)||anchor.time<frame.time||!Number.isFinite(anchor.x)||anchor.x<0||anchor.x>1)throw new Error('校准时间或位置无效')

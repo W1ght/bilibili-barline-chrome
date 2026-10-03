@@ -75,6 +75,10 @@ export const formatTime = (sec: number) => {
   return `${m}:${String(s).padStart(2, '0')}.${String(ms).padStart(3, '0')}`
 }
 
+/** BPM 统一保留一位小数（显示与手动输入）；内部计算仍用完整精度，避免长曲目累积漂移。 */
+export const roundBpm = (bpm: number) => Math.round(bpm * 10) / 10
+export const formatBpm = (bpm: number) => roundBpm(bpm).toFixed(1)
+
 /** "m:ss.mmm" -> 秒；解析失败返回 NaN。支持三种写法：
  * - 纯数字/小数：当作秒（如 `12` = 12 秒，`1.5` = 1.5 秒）
  * - 含 `:` 或 `：`：前面是分钟、后面是秒（如 `1:02` = 1 分 2 秒）。 */

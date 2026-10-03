@@ -1,6 +1,6 @@
 import { identity } from './chrome-adapter'
 import { fitBarMarks } from './beat-markers'
-import { LoopController } from './loop'
+import { LoopController, LoopSpan } from './loop'
 /**
  * 「音乐小节线」组件入口。
  *
@@ -39,6 +39,7 @@ import {
   loadConfig,
   locateBar,
   saveConfig,
+  formatBpm,
   formatTime,
   touchOpened,
 } from './config'
@@ -218,10 +219,27 @@ const loop = new LoopController({
   changed: () => {
     updateLoopIcon()
     overlay?.redraw()
+    const state = loopState()
+    for (const fn of loopListeners) fn(state)
   },
 })
 const resetLoop = () => loop.reset()
 const toggleLoop = () => loop.toggle()
+
+/** 段落练习：循环一段或几段（不相接时依次跳过去）。 */
+export interface LoopInfo { active: boolean; label: string; spans: LoopSpan[] }
+const loopListeners = new Set<(state: LoopInfo) => void>()
+const loopState = (): LoopInfo => ({ active: loop.state === 'looping' && Boolean(loop.spans), label: loop.label, spans: loop.spans ? loop.spans.map(s => ({ ...s })) : [] })
+export function loopSpans(spans: LoopSpan[], label: string) {
+  if (!currentVideo) { notice('视频尚未就绪，请稍后重试。', '循环'); return }
+  loop.playSpans(spans, label)
+}
+export function stopLoop() { if (loop.state !== 'off') { loop.reset(); notice('已关闭循环', '循环') } }
+export function onLoopState(fn: (state: LoopInfo) => void) {
+  loopListeners.add(fn)
+  fn(loopState())
+  return () => { loopListeners.delete(fn) }
+}
 
 const clearUiState = () => {
   metronome?.cancelCountIn()
@@ -348,7 +366,7 @@ export function markNextBar() {
     resetLoop()
     applyDraft(draft, 'markers')
     const error = fit.bars > 1 ? `，${fit.bars} 小节平均，最大偏差 ${Math.round(fit.maxError * 1000)} ms` : '，继续点「下一节」可提高精度'
-    markerNotice(`${fit.bpm.toFixed(2)} BPM（${segment.numerator}/${segment.denominator}）${error}。节拍器已开启。`)
+    markerNotice(`${formatBpm(fit.bpm)} BPM（${segment.numerator}/${segment.denominator}）${error}。节拍器已开启。`)
   } catch (error) { markerNotice((error as Error).message) }
 }
 /** 「重拍对齐此处」：保持 BPM 与拍号，平移小节网格，让当前播放位置成为某小节的第一拍。 */
@@ -615,10 +633,16 @@ const altShortcuts: Record<string, () => void> = {
 }
 
 const onKeydown = (e: KeyboardEvent) => {
-  if (!enabled || !currentVideo || shouldIgnoreKey()) {
+  if (!enabled || !currentVideo) {
     return
   }
-  if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && altShortcuts[e.code]) {
+  // Alt 快捷键在本插件面板的按钮上（例如刚点过谱行的 ⟳）也要生效；只有正在输入时忽略。
+  const isAlt = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && Boolean(altShortcuts[e.code])
+  const inPanel = Boolean((getActiveElement() as Element | null)?.closest?.('.barline-ui'))
+  if (isTyping() || (!(isAlt && inPanel) && shouldIgnoreKey())) {
+    return
+  }
+  if (isAlt) {
     e.preventDefault()
     e.stopImmediatePropagation()
     altShortcuts[e.code]()
@@ -694,6 +718,7 @@ const sync = async (id: { aid?: string; cid?: string }) => {
       overlay = new SegmentMarkerOverlay(progress, video, () => ({
         start: loop.startBar,
         end: loop.endBar,
+        spans: loop.spans ?? [],
       }))
       overlay.setConfig(currentConfig)
     }

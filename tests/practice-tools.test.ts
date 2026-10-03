@@ -1,7 +1,8 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
 import {Metronome,beatsInWindow} from '../src/metronome.ts'
-import {LoopController,loopRate} from '../src/loop.ts'
+import {LoopController,loopRate,mergeSpans} from '../src/loop.ts'
+import {chapterSpans} from '../src/score-chapters.ts'
 
 ;(globalThis as any).window ??= globalThis
 const cfg={segments:[{bpm:120,numerator:4,denominator:4,firstBeatTime:0}],metronomeMuted:false,metronomeVolume:1}
@@ -47,6 +48,39 @@ test('循环每遍加速到目标速度为止',()=>{
   assert.equal(loopRate(.8,{step:.1,target:1},1),.88)
   assert.equal(loopRate(.8,{step:.1,target:1},5),1)
   assert.equal(loopRate(1,{step:0,target:2},3),1)
+})
+
+test('段落片段：到下一段开头为止，吸附小节线，相接的段落合并为一段',()=>{
+  const chapters=[{id:'i',time:0,name:'前奏',color:'#000000'},{id:'a',time:8.1,name:'A段',color:'#000000'},{id:'b',time:16,name:'B段',color:'#000000'},{id:'o',time:30,name:'尾奏',color:'#000000'}]
+  const snap=(t:number)=>Math.round(t/2)*2
+  assert.deepEqual(chapterSpans(chapters,['a','o'],40,snap),[{start:8,end:16},{start:30,end:39.95}])
+  assert.deepEqual(mergeSpans(chapterSpans(chapters,['a','b'],40)),[{start:8.1,end:30}])
+})
+
+test('多段循环：一段放完直接跳到下一段，最后一段放完带预备拍回到第一段，手动跳进某段从那段继续',()=>{
+  const video=fakeVideo(0);video.paused=false
+  let countIns=0
+  const loop=new LoopController({video:()=>video,config:()=>cfg as any,countIn:(_s,done)=>{countIns++;done()},cancelCountIn(){},
+    countInDisabled:()=>false,speed:()=>({step:0,target:1}),resync(){},notify(){},changed(){}})
+  loop.playSpans([{start:30,end:38},{start:8,end:16}],'A段 + 尾奏')
+  assert.equal(video.currentTime,8);assert.equal(countIns,1)
+  video.currentTime=15.999;(loop as any).check()
+  assert.equal(video.currentTime,30);assert.equal(countIns,1,'段间不打预备拍');assert.equal(video.paused,false)
+  video.currentTime=37.999;(loop as any).check()
+  assert.equal(video.currentTime,8);assert.equal(countIns,2);assert.equal(loop.round,1)
+  video.currentTime=33;(loop as any).check();assert.equal(loop.end,38)
+  loop.reset();assert.equal(loop.spans,null);assert.equal(loop.state,'off')
+})
+
+test('没有节拍配置时，谱行 / 段落循环也能用 Alt+L（toggle）关闭',()=>{
+  const video=fakeVideo(0,1);video.paused=false
+  const loop=new LoopController({video:()=>video,config:()=>null,countIn:(_s,done)=>done(),cancelCountIn(){},
+    countInDisabled:()=>false,speed:()=>({step:0,target:1}),resync(){},notify(){},changed(){}})
+  loop.playSpans([{start:5,end:9}],'第 2 行')
+  assert.equal(loop.state,'looping');assert.equal(video.currentTime,5)
+  loop.toggle()
+  assert.equal(loop.state,'off');assert.equal(loop.spans,null)
+  video.currentTime=9.5;(loop as any).check();assert.equal(video.currentTime,9.5,'关闭后不再跳回')
 })
 
 test('循环包含起止所在小节，到终点按预备拍回到起点并加速，关闭后恢复原速度',()=>{

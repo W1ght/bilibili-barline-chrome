@@ -6,7 +6,7 @@
  */
 
 import { addStyle } from '@/core/style'
-import { BarConfig, barStartTime, buildTimeline } from './config'
+import { BarConfig, barStartTime, buildTimeline, formatBpm } from './config'
 import styles from './styles.scss?inline'
 
 let stylesAdded = false
@@ -29,7 +29,7 @@ export class SegmentMarkerOverlay {
   constructor(
     private progress: HTMLElement,
     private video: HTMLVideoElement,
-    private getLoopBars: () => { start: number | null; end: number | null },
+    private getLoopBars: () => { start: number | null; end: number | null; spans?: { start: number; end: number }[] },
   ) {
     ensureStyles()
     const cs = getComputedStyle(progress)
@@ -109,7 +109,7 @@ export class SegmentMarkerOverlay {
       const prev = i > 0 ? infos[i - 1].segment : null
       const parts: string[] = []
       if (!prev || info.segment.bpm !== prev.bpm) {
-        parts.push(String(info.segment.bpm))
+        parts.push(formatBpm(info.segment.bpm))
       }
       if (
         !prev ||
@@ -122,7 +122,15 @@ export class SegmentMarkerOverlay {
     }
 
     // 循环标记（橙色，只显示小节序号）。
-    const { start, end } = this.getLoopBars()
+    const { start, end, spans = [] } = this.getLoopBars()
+    // 段落循环：每段一条高亮带。
+    for (const s of spans) {
+      const band = document.createElement('div')
+      band.className = 'barline-loop-band'
+      band.style.left = `${(s.start / duration) * 100}%`
+      band.style.width = `${((Math.min(s.end, duration) - s.start) / duration) * 100}%`
+      this.overlayEl.append(band)
+    }
     if (start !== null) {
       const time = barStartTime(cfg, start)
       if (time !== null) {

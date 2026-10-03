@@ -44,7 +44,7 @@ export function inkMask(rgba:Uint8ClampedArray,width:number,height:number,cursor
   return {mask,width,height,ink:raw/Math.max(1,n),count}
 }
 
-function dilate(m:InkMask){
+export function dilate(m:InkMask){
   const {width:w,height:h}=m,a=new Uint8Array(m.mask.length),b=new Uint8Array(m.mask.length)
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;a[i]=m.mask[i]|(x>0?m.mask[i-1]:0)|(x<w-1?m.mask[i+1]:0)}
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;b[i]=a[i]|(y>0?a[i-w]:0)|(y<h-1?a[i+w]:0)}

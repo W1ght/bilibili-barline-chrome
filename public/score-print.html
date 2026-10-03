@@ -15,12 +15,13 @@ figure{margin:0 0 14px;break-inside:avoid}
 figure img{display:block;width:100%}
 figcaption{display:flex;gap:8px;align-items:center;margin-bottom:4px;color:var(--muted);font-size:11px}
 figcaption b{color:var(--text)}
+figcaption em{font-style:normal;padding:0 6px;border-radius:999px;border:1px solid var(--accent);color:var(--accent)}
 figcaption i{font-style:normal;padding:0 6px;border-radius:999px;color:#fff;background:var(--c)}
 body.no-captions figcaption{display:none}
 body.compact figure{margin-bottom:4px}
 .empty{color:var(--muted);text-align:center;padding:60px 0}
 @media print{body{background:#fff}.bar{display:none}main{max-width:none;margin:0;padding:0;box-shadow:none}@page{size:A4;margin:12mm}}
 </style></head>
-<body><div class="bar"><label><input type="checkbox" id="captions" checked>显示行号与时间</label><label><input type="checkbox" id="compact">紧凑排版</label><button id="print">打印 / 另存为 PDF</button></div>
+<body><div class="bar"><label title="反复记号等让同一行演奏多次时，每行只印一次，标注各次演奏时间"><input type="checkbox" id="merge" checked>合并重复行</label><label><input type="checkbox" id="captions" checked>显示行号与时间</label><label><input type="checkbox" id="compact">紧凑排版</label><button id="print">打印 / 另存为 PDF</button></div>
 <main><h1 id="title">正在加载…</h1><p class="meta" id="meta"></p><div class="legend" id="legend"></div><div id="score"></div></main>
 <script src="score-print.js"></script></body></html>

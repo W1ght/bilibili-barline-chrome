@@ -27,6 +27,19 @@ export function loopRate(base: number, speed: LoopSpeed, round: number): number 
   return Math.min(speed.target, Number((base * (1 + speed.step) ** round).toFixed(3)))
 }
 
+export interface LoopSpan { start: number; end: number }
+
+/** 排序并合并相接（间隔 < 50ms）或重叠的片段。 */
+export function mergeSpans(spans: LoopSpan[]): LoopSpan[] {
+  const out: LoopSpan[] = []
+  for (const s of [...spans].filter(s => Number.isFinite(s.start) && s.end - s.start > 0.05).sort((a, b) => a.start - b.start)) {
+    const last = out[out.length - 1]
+    if (last && s.start <= last.end + 0.05) last.end = Math.max(last.end, s.end)
+    else out.push({ ...s })
+  }
+  return out
+}
+
 export class LoopController {
   state: LoopState = 'off'
   start: number | null = null
@@ -34,6 +47,10 @@ export class LoopController {
   startBar: number | null = null
   endBar: number | null = null
   round = 0
+  /** 多段循环：按时间顺序依次播放，最后一段结束后回到第一段。 */
+  spans: LoopSpan[] | null = null
+  label = ''
+  private spanIndex = 0
   private baseRate: number | null = null
   private frameId = 0
   private timer = 0
@@ -45,6 +62,12 @@ export class LoopController {
 
   /** 依次：设起点 → 设终点并开始循环 → 关闭。 */
   toggle() {
+    // 关闭不依赖节拍配置：只标了段落 / 抄了谱的循环也要能关掉。
+    if (this.state === 'looping') {
+      this.reset()
+      this.host.notify('已关闭循环')
+      return
+    }
     const video = this.host.video(), cfg = this.host.config()
     if (!video || !cfg) return
     const loc = locateBar(cfg, video.currentTime)
@@ -78,7 +101,34 @@ export class LoopController {
     this.host.changed()
   }
 
+  /**
+   * 循环一个或几个片段（段落练习）。不相接的片段之间直接跳过去，不打预备拍；
+   * 每遍从第一段重新开始时才打预备拍、按设置加速。
+   */
+  playSpans(spans: LoopSpan[], label: string) {
+    const video = this.host.video()
+    const merged = mergeSpans(spans)
+    if (!video || !merged.length) return
+    const wasPlaying = !video.paused
+    this.reset()
+    this.spans = merged
+    this.label = label
+    this.spanIndex = 0
+    this.start = merged[0].start
+    this.end = merged[0].end
+    this.state = 'looping'
+    this.round = 0
+    this.baseRate = video.playbackRate
+    this.watch(video)
+    this.host.notify(`循环 ${label}${this.speedLabel()}`)
+    this.host.changed()
+    this.restart(video, wasPlaying)
+  }
+
   reset() {
+    this.spans = null
+    this.label = ''
+    this.spanIndex = 0
     this.unwatch()
     this.host.cancelCountIn()
     const video = this.host.video()
@@ -100,7 +150,7 @@ export class LoopController {
 
   private restart(video: HTMLVideoElement, play: boolean) {
     const cfg = this.host.config()
-    if (this.start === null || !cfg) return
+    if (this.start === null) return
     this.wrapping = true
     video.pause()
     video.currentTime = this.start
@@ -109,13 +159,29 @@ export class LoopController {
       this.wrapping = false
       if (play) void video.play().catch(() => {})
     }
-    const segment = segmentAt(cfg, this.start)
+    // 没有节拍配置（只标了段落）时不打预备拍。
+    const segment = cfg ? segmentAt(cfg, this.start) : null
     if (play && segment && !this.host.countInDisabled()) this.host.countIn(segment, resume)
     else resume()
   }
 
   private wrap(video: HTMLVideoElement) {
     if (this.wrapping || this.state !== 'looping') return
+    const spans = this.spans
+    if (spans && this.spanIndex < spans.length - 1) {
+      // 下一段：直接跳过去接着播。
+      const next = spans[++this.spanIndex]
+      this.start = next.start
+      this.end = next.end
+      video.currentTime = next.start
+      this.host.resync()
+      return
+    }
+    if (spans) {
+      this.spanIndex = 0
+      this.start = spans[0].start
+      this.end = spans[0].end
+    }
     this.round += 1
     if (this.baseRate !== null) {
       const rate = loopRate(this.baseRate, this.host.speed(), this.round)
@@ -130,6 +196,11 @@ export class LoopController {
   private check = () => {
     const video = this.watched
     if (!video || this.state !== 'looping' || this.end === null || this.wrapping || video.paused) return
+    // 多段循环中手动跳到了另一段：从那一段继续。
+    if (this.spans) {
+      const t = video.currentTime, i = this.spans.findIndex(s => t >= s.start - 0.02 && t < s.end)
+      if (i >= 0 && i !== this.spanIndex) { this.spanIndex = i; this.start = this.spans[i].start; this.end = this.spans[i].end }
+    }
     const left = (this.end - video.currentTime) / (video.playbackRate || 1)
     if (left <= 0.004) { this.wrap(video); return }
     // 最后一小段用定时器卡准终点，而不是等下一帧。

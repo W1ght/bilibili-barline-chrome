@@ -1,10 +1,14 @@
 <template>
   <div class="barline-editor" :class="{embedded}">
     <section class="ble-hero" aria-label="当前节拍">
-      <label class="ble-hero-bpm" title="四分音符每分钟拍数">
-        <input aria-label="BPM" type="number" :min="BPM_MIN" :max="BPM_MAX" step="1" :value="round(segments[0].bpm)" @input="onBpmInput(0, $event)" @change="onBpmChange(0, $event)" />
+      <span class="ble-hero-bpm">
+        <button class="ghost small ble-nudge" title="减慢 0.1 BPM（Shift 点击减 1）" aria-label="减慢 BPM" @click="nudgeBpm(-1, $event)">−</button>
+        <label title="四分音符每分钟拍数，精确到 0.1">
+          <input aria-label="BPM" type="number" :min="BPM_MIN" :max="BPM_MAX" step="0.1" :value="roundBpm(segments[0].bpm)" @input="onBpmInput(0, $event)" @change="onBpmChange(0, $event)" />
+        </label>
+        <button class="ghost small ble-nudge" title="加快 0.1 BPM（Shift 点击加 1）" aria-label="加快 BPM" @click="nudgeBpm(1, $event)">＋</button>
         <span>BPM</span>
-      </label>
+      </span>
       <span class="bl-input-group ble-hero-meter" title="拍号">
         <input aria-label="每小节拍数" type="number" :min="NUMERATOR_MIN" :max="NUMERATOR_MAX" step="1" :value="segments[0].numerator" @input="onNumeratorInput(0, $event)" @change="onNumeratorChange(0, $event)" />
         <b>/</b>
@@ -18,8 +22,27 @@
         第一拍 <b>{{ formatTime(segments[0].firstBeatTime ?? 0) }}</b>
         <button class="ghost small" aria-label="提前一拍" @click="nudgeFirstBeat(-1)">‹</button>
         <button class="ghost small" aria-label="推后一拍" @click="nudgeFirstBeat(1)">›</button>
-        <button class="ghost small" title="保持 BPM 和拍号，平移小节网格，让当前播放位置成为重拍（Alt+3）" @click="alignDownbeatHere">此处为重拍</button>
+        <button class="ghost small ble-here" title="保持 BPM 和拍号，平移小节网格，让当前播放位置成为重拍（Alt+3）" @click="alignDownbeatHere">此处为重拍</button>
       </span>
+    </section>
+
+    <section v-if="allSources.length" class="ble-card ble-sources" aria-label="应用速度">
+      <div class="ble-card-head">
+        <h3>应用速度</h3>
+        <span class="bl-muted">选一个来源，写入节拍器</span>
+      </div>
+      <label v-for="s in allSources" :key="s.id" class="ble-source" :class="{active: activeSource && activeSource.id === s.id}">
+        <input type="radio" name="ble-source" :value="s.id" :checked="activeSource && activeSource.id === s.id" @change="selectedSource = s.id" />
+        <span class="ble-source-name">{{ s.label }}</span>
+        <b>{{ formatBpm(s.bpm) }}</b><small>BPM</small>
+        <span :class="['ble-source-detail', s.warn ? 'warn' : '']">{{ s.detail }}</span>
+      </label>
+      <slot name="source-notes"></slot>
+      <div class="bl-row">
+        <span class="bl-muted">{{ activeSource && activeSource.hint }}</span>
+        <span class="sp-push"></span>
+        <button class="primary" :disabled="!activeSource || activeSource.disabled" @click="applySource">应用到节拍器</button>
+      </div>
     </section>
 
     <slot name="auto"></slot>
@@ -54,7 +77,7 @@
               <b>小节起</b>
             </span>
             <span class="bl-input-group">
-              <input aria-label="BPM" type="number" :min="BPM_MIN" :max="BPM_MAX" step="1" :value="round(segment.bpm)" @input="onBpmInput(index + 1, $event)" @change="onBpmChange(index + 1, $event)" />
+              <input aria-label="BPM" type="number" :min="BPM_MIN" :max="BPM_MAX" step="0.1" :value="roundBpm(segment.bpm)" @input="onBpmInput(index + 1, $event)" @change="onBpmChange(index + 1, $event)" />
               <b>BPM</b>
             </span>
             <span class="bl-input-group">
@@ -76,9 +99,9 @@
           <small>{{ videoPaused ? '先播放视频' : '跟着音乐连续点击' }}</small>
         </button>
         <div class="ble-tap-value">
-          <b :class="{ active: tapValue }">{{ tapValue || '—' }}</b><span>BPM</span>
+          <b :class="{ active: tapValue }">{{ tapValue ? formatBpm(tapValue) : '—' }}</b><span>BPM</span>
         </div>
-        <button class="small" :disabled="!tapValue" @click="applyTap">应用</button>
+        <span class="bl-muted">{{ tapValue ? '在上方「应用速度」里应用' : '' }}</span>
       </section>
 
       <section class="ble-sub" aria-label="按时间输入">
@@ -121,12 +144,26 @@ import {
   TimeSignatureSegment,
   clamp,
   firstBeatForDownbeatAt,
+  formatBpm,
   formatTime,
   locateBar,
   normalizeConfig,
   parseTime,
+  roundBpm,
   segmentBeatDuration,
 } from './config'
+
+/** 「应用速度」卡片里的一个来源（谱面、音频、打拍子……），统一由一个按钮写入节拍器。 */
+export interface TempoSource {
+  id: string
+  label: string
+  bpm: number
+  detail?: string
+  warn?: boolean
+  hint?: string
+  disabled?: boolean
+  apply: () => void
+}
 
 export default Vue.extend({
   name: 'BarLineEditor',
@@ -140,6 +177,8 @@ export default Vue.extend({
     embedded: { type: Boolean, default: false },
     /** Bumped by the panel when the config changed elsewhere (control bar, auto alignment, volume). */
     revision: { type: Number, default: 0 },
+    /** 外部提供的速度来源（谱面对齐、音频分析），与打拍子结果一起列在「应用速度」里。 */
+    sources: { type: Array, default: () => [] },
   },
   data() {
     const normalized = normalizeConfig(this.initial as BarConfig)
@@ -152,6 +191,7 @@ export default Vue.extend({
       manualCalibration: normalized.manualCalibration,
       tapTimes: [] as number[],
       tapValue: 0,
+      selectedSource: '',
       videoPaused: true,
       marks: [] as number[],
       manualMark: '',
@@ -188,8 +228,26 @@ export default Vue.extend({
       const f = this.fit
       if (!f) return ''
       return f.bars > 1
-        ? `${f.bpm.toFixed(2)} BPM · ${f.bars} 小节平均 · 最大偏差 ${Math.round(f.maxError * 1000)} ms`
-        : `${f.bpm.toFixed(2)} BPM · 再标几个小节更准`
+        ? `${formatBpm(f.bpm)} BPM · ${f.bars} 小节平均 · 最大偏差 ${Math.round(f.maxError * 1000)} ms`
+        : `${formatBpm(f.bpm)} BPM · 再标几个小节更准`
+    },
+    allSources(): TempoSource[] {
+      const list = [...(this.sources as TempoSource[])]
+      if (this.tapValue) {
+        list.push({
+          id: 'tap',
+          label: '打拍子',
+          bpm: this.tapValue,
+          detail: `${this.tapTimes.length} 次点击`,
+          hint: '只改第 1 段速度，第一拍对齐到点击；重拍不对再点「此处为重拍」。',
+          apply: () => this.applyTap(),
+        })
+      }
+      return list
+    },
+    activeSource(): TempoSource | null {
+      const list = this.allSources
+      return list.find(s => s.id === this.selectedSource) ?? list[0] ?? null
     },
   },
   watch: {
@@ -231,8 +289,15 @@ export default Vue.extend({
   },
   methods: {
     formatTime,
-    round(value: number) {
-      return Math.round(value * 100) / 100
+    formatBpm,
+    roundBpm,
+    applySource() {
+      this.activeSource?.apply()
+    },
+    /** BPM 微调：每次 ±0.1，按住 Shift ±1；第一拍位置不动。 */
+    nudgeBpm(direction: number, e: MouseEvent) {
+      const segment = this.segments[0]
+      segment.bpm = clamp(roundBpm(segment.bpm + direction * (e.shiftKey ? 1 : 0.1)), BPM_MIN, BPM_MAX)
     },
     async toggleMarkerPlayback() {
       const video = this.video as HTMLVideoElement
@@ -310,13 +375,16 @@ export default Vue.extend({
     onBpmInput(index: number, e: Event) {
       const value = Number((e.target as HTMLInputElement).value)
       if (Number.isFinite(value) && value >= BPM_MIN && value <= BPM_MAX) {
-        this.segments[index].bpm = value
+        this.segments[index].bpm = roundBpm(value)
       }
     },
     onBpmChange(index: number, e: Event) {
       const input = e.target as HTMLInputElement
-      this.segments[index].bpm = clamp(Number(input.value) || DEFAULT_SEGMENT.bpm, BPM_MIN, BPM_MAX)
-      input.value = String(this.segments[index].bpm)
+      const typed = Number(input.value)
+      // 输入框显示的是一位小数；值没改时保留原来的完整精度（例如打点拟合的结果）。
+      if (typed === roundBpm(this.segments[index].bpm)) return
+      this.segments[index].bpm = clamp(roundBpm(typed || DEFAULT_SEGMENT.bpm), BPM_MIN, BPM_MAX)
+      input.value = String(roundBpm(this.segments[index].bpm))
     },
     onNumeratorInput(index: number, e: Event) {
       const value = Math.round(Number((e.target as HTMLInputElement).value))
@@ -403,7 +471,8 @@ export default Vue.extend({
         return
       }
       const avg = valid.reduce((sum, d) => sum + d, 0) / valid.length
-      this.tapValue = clamp(Math.round(60 / avg), BPM_MIN, BPM_MAX)
+      this.tapValue = clamp(roundBpm(60 / avg), BPM_MIN, BPM_MAX)
+      this.selectedSource = 'tap'
     },
     applyTap() {
       if (!this.tapValue || !this.segments[0]) return
